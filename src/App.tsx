@@ -38,6 +38,7 @@ export default function App() {
   const [studentCountryInput, setStudentCountryInput] = useState("Morocco");
   const [studentGenderInput, setStudentGenderInput] = useState("Femenino");
   const [studentGoalInput, setStudentGoalInput] = useState("FP Grado Superior");
+  const [studentSpanishLevelInput, setStudentSpanishLevelInput] = useState("A1");
   const [studentAgeInput, setStudentAgeInput] = useState("20");
   const [studentCurrentEduInput, setStudentCurrentEduInput] = useState("Bachillerato");
   const [studentCurrentCityInput, setStudentCurrentCityInput] = useState("");
@@ -63,7 +64,11 @@ export default function App() {
       goal: "FP Grado Superior",
       xp: 0,
       streak: 3,
-      level: "A1"
+      level: "A1",
+      lives: 10,
+      lastLivesRefill: new Date().toDateString(),
+      passedExamsForLevel: {},
+      levelLocked: false
     };
   });
 
@@ -91,7 +96,11 @@ export default function App() {
               goal: matched.academicGoal,
               xp: matched.xp,
               streak: matched.streak || 3,
-              level: matched.level
+              level: matched.level,
+              lives: matched.lives !== undefined ? matched.lives : 10,
+              lastLivesRefill: matched.lastLivesRefill || new Date().toDateString(),
+              passedExams_v2: matched.passedExams_v2 || [],
+              passedExamsForLevel: matched.passedExamsForLevel || {}
             });
           }
         }
@@ -145,7 +154,11 @@ export default function App() {
           country: profile.country,
           academicGoal: profile.goal,
           xp: profile.xp,
-          level: profile.level
+          level: profile.level,
+          lives: profile.lives,
+          lastLivesRefill: profile.lastLivesRefill,
+          passedExams_v2: profile.passedExams_v2,
+          passedExamsForLevel: profile.passedExamsForLevel
         });
       }
     }
@@ -195,6 +208,7 @@ export default function App() {
           country: studentCountryInput,
           gender: studentGenderInput,
           academicGoal: studentGoalInput,
+          spanishLevel: studentSpanishLevelInput,
           age: Number(studentAgeInput) || 20,
           currentEducation: studentCurrentEduInput,
           city: studentCurrentCityInput.trim(),
@@ -231,13 +245,13 @@ export default function App() {
       setAuthError("Ingrese el correo administrativo y contraseña.");
       return;
     }
-    if (adminEmailInput.trim().toLowerCase() === "acceso") {
+    if (adminEmailInput.trim().toLowerCase() === "soullis8@gmail.com" && adminPasswordInput === "Sullivanem123") {
       localStorage.setItem("sp_user_role", "admin");
-      localStorage.setItem("sp_logged_email", "admin@espana.com");
+      localStorage.setItem("sp_logged_email", "soullis8@gmail.com");
       setUserRole("admin");
-      setLoggedInEmail("admin@espana.com");
+      setLoggedInEmail("soullis8@gmail.com");
     } else {
-      setAuthError("Credenciales inválidas del administrador (Tip: admin@espana.com / admin123)");
+      setAuthError("Acceso denegado.");
     }
   };
 
@@ -678,36 +692,67 @@ export default function App() {
     setExamPassed(passed);
     setExamSubmitted(true);
 
-    if (passed) {
-      const examKey = `${selectedLevel}-${selectedExamId}`;
-      setProfile(prev => {
+    setProfile(prev => {
+      const today = new Date().toDateString();
+      // Auto-refill lives daily (+3 per day, max 10)
+      let currentLives = prev.lives !== undefined ? prev.lives : 10;
+      let lastRefill = prev.lastLivesRefill || today;
+      if (lastRefill !== today) {
+        currentLives = Math.min(10, currentLives + 3);
+        lastRefill = today;
+      }
+
+      if (passed) {
+        const examKey = `${selectedLevel}-${selectedExamId}`;
         const currentPassed = prev.passedExams_v2 || [];
         const updatedPassed = currentPassed.includes(examKey)
           ? currentPassed
           : [...currentPassed, examKey];
 
+        // Count passed exams for current level
+        const passedForLevel = prev.passedExamsForLevel || {};
+        const levelPassedCount = (passedForLevel[selectedLevel] || 0);
+        const alreadyCounted = currentPassed.includes(examKey);
+        const newLevelCount = alreadyCounted ? levelPassedCount : levelPassedCount + 1;
+        const updatedPassedForLevel = { ...passedForLevel, [selectedLevel]: newLevelCount };
+
         const allLevels = ["A1", "A2", "B1", "B2", "C1", "C2"];
         const currentIdx = allLevels.indexOf(prev.level);
 
-        if (selectedLevel === prev.level && currentIdx < allLevels.length - 1) {
+        // Level up if 3 exams passed at current level
+        if (selectedLevel === prev.level && newLevelCount >= 3 && currentIdx < allLevels.length - 1) {
           const nextLevel = allLevels[currentIdx + 1];
           setSelectedLevel(nextLevel);
           setCurrentPage(getMinPage(nextLevel));
           return {
             ...prev,
             level: nextLevel,
-            xp: prev.xp + 150,
-            passedExams_v2: updatedPassed
+            xp: prev.xp + 100,
+            lives: currentLives,
+            lastLivesRefill: lastRefill,
+            passedExams_v2: updatedPassed,
+            passedExamsForLevel: { ...updatedPassedForLevel, [nextLevel]: 0 }
           };
         } else {
           return {
             ...prev,
             xp: prev.xp + 100,
-            passedExams_v2: updatedPassed
+            lives: currentLives,
+            lastLivesRefill: lastRefill,
+            passedExams_v2: updatedPassed,
+            passedExamsForLevel: updatedPassedForLevel
           };
         }
-      });
-    }
+      } else {
+        // Failed exam: -3 lives
+        const newLives = Math.max(0, currentLives - 3);
+        return {
+          ...prev,
+          lives: newLives,
+          lastLivesRefill: lastRefill
+        };
+      }
+    });
   };
 
   // Community Chat action
@@ -929,7 +974,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-xs font-mono text-gray-400">Bienvenido, <strong>Admin </strong></span>
+            <span className="text-xs font-mono text-gray-400">Bienvenido, <strong>Administrador</strong></span>
             <button 
               onClick={handleLogout}
               className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold rounded-xl transition-all cursor-pointer font-sans"
@@ -979,7 +1024,7 @@ export default function App() {
                 onClick={() => { setActivePortalTab("creator"); setAuthError(""); }}
                 className={`flex-1 py-4 text-xs sm:text-sm font-bold tracking-wider uppercase transition-colors ${activePortalTab === "creator" ? 'bg-[#0b1222] text-amber-400 border-b-2 border-amber-500' : 'text-gray-400 hover:text-white hover:bg-gray-800/20'}`}
               >
-                🏢 Portal de Anfitriones y Creadores (Dueño)
+                🏢 Portal de Anfitriones y Creadores
               </button>
             </div>
 
@@ -1180,6 +1225,23 @@ export default function App() {
                     </div>
                   </div>
 
+                  <div className="bg-[#070f1a] border border-amber-500/20 p-4 rounded-2xl">
+                    <label className="text-[10px] text-amber-500 uppercase font-mono block mb-2 font-bold">🎓 Tu Nivel Actual de Español</label>
+                    <p className="text-[10px] text-gray-500 mb-2">Este nivel no podrá modificarse después del registro.</p>
+                    <select
+                      value={studentSpanishLevelInput}
+                      onChange={(e) => setStudentSpanishLevelInput(e.target.value)}
+                      className="w-full bg-[#070a13] border border-amber-500/30 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500 font-sans"
+                    >
+                      <option value="A1">A1 — Principiante (no sé nada de español)</option>
+                      <option value="A2">A2 — Básico (entiendo frases simples)</option>
+                      <option value="B1">B1 — Intermedio (me comunico en situaciones cotidianas)</option>
+                      <option value="B2">B2 — Intermedio-Alto (converso con fluidez)</option>
+                      <option value="C1">C1 — Avanzado (dominio casi nativo)</option>
+                      <option value="C2">C2 — Maestría (nivel universitario nativo)</option>
+                    </select>
+                  </div>
+
                   <button
                     type="submit"
                     className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs tracking-widest uppercase rounded-2xl cursor-pointer transition-transform duration-150 transform active:scale-95 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 font-sans text-center mt-5"
@@ -1190,8 +1252,7 @@ export default function App() {
               ) : (
                 <form onSubmit={handleAdminLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <p className="text-[10px] text-amber-500 uppercase tracking-widest font-mono font-bold font-sans">Acceso restringido</p>
-                    <p className="text-xs text-gray-400 leading-snug font-sans">.</p>
+                    <p className="text-xs text-gray-400 leading-snug font-sans">Acceso restringido. Solo personal autorizado.</p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1199,7 +1260,7 @@ export default function App() {
                       <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1.5 font-sans font-sans">Correo del Administrador</label>
                       <input
                         type="email"
-                        placeholder="admin@espana.com"
+                        placeholder="correo@ejemplo.com"
                         value={adminEmailInput}
                         onChange={(e) => setAdminEmailInput(e.target.value)}
                         className="w-full bg-[#070a13] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500 font-sans"
@@ -1219,16 +1280,13 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="bg-[#070f1a] border border-gray-800/50 p-3 rounded-2xl text-[11px] text-gray-400 flex items-start gap-2 mt-2 font-sans font-medium">
-                    <span className="text-amber-500 font-sans">💡</span>
-                    <p></strong>.</p>
-                  </div>
+
 
                   <button
                     type="submit"
                     className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs tracking-widest uppercase rounded-2xl cursor-pointer transition-transform mt-4 flex items-center justify-center gap-2 font-sans text-center"
                   >
-                    Iniciar Consola de Creadores y Dueño ➔
+                    Iniciar Consola de Creadores ➔
                   </button>
                 </form>
               )}
@@ -1293,9 +1351,16 @@ export default function App() {
               <span className="text-emerald-400 font-bold">{profile.xp} XP</span>
             </div>
             <div className="w-px h-4 bg-gray-700"></div>
-            <div className="flex items-center gap-1">
-              <Flame size={12} className="text-amber-500 fill-amber-500 animate-pulse" />
-              <span className="text-amber-400 font-bold">{profile.streak}d</span>
+            <div className="flex items-center gap-1 cursor-pointer" title={`Vidas: ${profile.lives !== undefined ? profile.lives : 10}/10. Examen fallado: -3. Cada día: +3 automático.`}>
+              {Array.from({length: Math.min(profile.lives !== undefined ? profile.lives : 10, 10)}).map((_, i) => (
+                <Flame key={i} size={10} className="text-amber-500 fill-amber-500" />
+              ))}
+              <span className="text-amber-400 font-bold ml-1">{profile.lives !== undefined ? profile.lives : 10}/10</span>
+            </div>
+            <div className="w-px h-4 bg-gray-700"></div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-500 font-sans uppercase">Exámenes</span>
+              <span className="text-blue-400 font-bold">{((profile.passedExamsForLevel || {})[profile.level] || 0)}/3</span>
             </div>
             <div className="w-px h-4 bg-gray-700"></div>
             <div className="flex items-center gap-1.5">
@@ -2159,9 +2224,9 @@ export default function App() {
                          "Les meilleures chambres partent en quelques heures. Activez impérativement les alertes de recherche pour être informé à la minute de tout nouveau bien."}
                       </p>
                       <p>
-                        <strong>2. {lang === "ar" ? "الاتصال المباشر أفضل من الرسائل:" : "Contacter par Téléphone/WhatsApp :"}</strong>{" "}
+                        <strong>2. {lang === "ar" ? "الاتصال المباشر أفضل من الرسائل:" : "Contacter par Email :"}</strong>{" "}
                         {lang === "ar" ? "يفضل دائمًا الاتصال الهاتفي أو إرسال واتساب على الرقم المعلن عوضًا عن البريد الإلكتروني التقليدي للحصول على رد سريع." : 
-                         "Privilégiez les appels ou messages WhatsApp directs dès qu'un numéro est affiché, cela multiplie par 5 vos chances d'obtenir une visite."}
+                         "Contactez directement par email les professeurs pour toute question ou demande de cours."}
                       </p>
                     </div>
                     <div className="space-y-2 bg-[#0c1222]/40 p-3 rounded-lg border border-gray-800/45">
@@ -3616,16 +3681,7 @@ export default function App() {
                       >
                         {lang === "es" ? "📩 Contactar por Email" : lang === "ar" ? "📩 اتصل بالبريد" : "📩 Contact by Email"}
                       </a>
-                      {tch.phone && (
-                        <a 
-                          href={`https://wa.me/${tch.phone.replace(/[\s+]/g, "")}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-4 py-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 text-xs font-bold rounded-xl transition-all flex items-center justify-center"
-                        >
-                          💬 WhatsApp
-                        </a>
-                      )}
+
                     </div>
                   </div>
                 ))}
