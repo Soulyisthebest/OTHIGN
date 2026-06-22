@@ -842,6 +842,78 @@ export const FORMATIONS: Record<string, Formulation> = {
           fr: ['Ouvrier sylviculture', 'Assistant parcs naturels', 'Agent d’entretien forestier', 'Guide environnemental'],
           es: ['Trabajador forestal', 'Auxiliar de parques naturales', 'Motoserrista de explotación', 'Guía de conservación natural']
         }
+      },
+      {
+        name: { en: 'Commercial Activities (FP)', ar: 'الأنشطة التجارية والتسويقية', fr: 'Activités Commerciales', es: 'Actividades Comerciales' },
+        salidas: {
+          en: ['Sales representative', 'Merchant shop supervisor', 'Stock manager', 'Customer relations'],
+          ar: ['ممثل مبيعات', 'مشرف متجر تجاري', 'مسؤول مخزون', 'علاقات عملاء'],
+          fr: ['Attaché commercial', 'Responsable de magasin', 'Gestionnaire de stock', 'Chargé clientèle'],
+          es: ['Asesor comercial', 'Técnico de ventas', 'Gestor de stock', 'Encargado de tienda']
+        }
+      },
+      {
+        name: { en: 'Cooking and Gastronomy (FP)', ar: 'الطبخ وفنون الطهي', fr: 'Cuisine et Gastronomie', es: 'Cocina y Gastronomía' },
+        salidas: {
+          en: ['Kitchen cook', 'Pastry assistant', 'Catering cook helper', 'Food preparer'],
+          ar: ['طباخ محترف', 'مساعد حلواني', 'طباخ تموين', 'مجهز طعام'],
+          fr: ['Cuisinier', 'Assistant pâtissier', 'Commis de cuisine', 'Préparateur traiteur'],
+          es: ['Cocinero', 'Ayudante de repostería', 'Cocinero de catering', 'Auxiliar de preparación']
+        }
+      },
+      {
+        name: { en: 'Microcomputer Systems and Networks (SMR)', ar: 'الأنظمة والشبكات الدقيقة SMR', fr: 'Systèmes Micro-informatiques et Réseaux (SMR)', es: 'Sistemas Microinformáticos y Redes (SMR)' },
+        salidas: {
+          en: ['IT support technician', 'Network assistant inst', 'System maintenance help', 'Retail computer sales'],
+          ar: ['تقني دعم فني معلوماتي', 'مساعد تركيب شبكات', 'عامل صيانة أنظمة', 'مبيعات منتجات الحاسوب'],
+          fr: ['Technicien support info', 'Assistant réseaux', 'Technicien de maintenance pc', 'Vendeur micro-informatique'],
+          es: ['Técnico de soporte informático', 'Instalador de redes locales', 'Mantenedor de sistemas informáticos', 'Vendedor de ordenadores']
+        }
+      },
+      {
+        name: { en: 'Electrical and Automatic Installations', ar: 'التركيبات الكهربائية والآلية', fr: 'Installations Électriques et Automatiques', es: 'Instalaciones Eléctricas y Automáticas' },
+        salidas: {
+          en: ['Electrician installer', 'Home automation systems tech', 'Industrial electric maintenance assistant', 'Machinery installer assistant'],
+          ar: ['مساعد كهربائي منزلي وصناعي', 'تقني أنظمة كهربائية ذكية', 'مساعد صيانة كهرباء صناعية', 'مساعد تركيب آلات'],
+          fr: ['Électricien', 'Domoticien junior', 'Assistant maintenance élec', 'Monteur réseaux élec'],
+          es: ['Electricista de edificios', 'Ayudante de automatismos', 'Instalador domótico', 'Mantenedor de redes de baja tensión']
+        }
+      },
+      {
+        name: { en: 'Machining and Welding', ar: 'التشغيل الآلي واللحام والمعادن', fr: 'Usinage and Soudage', es: 'Mecanizado y Soldadura' },
+        salidas: {
+          en: ['CNC operator helper', 'Industrial welder', 'Metal fabricator', 'Machining equipment maintenance'],
+          ar: ['مشغل ماكينات CNC', 'لحام صناعي', 'صانع هياكل معدنية', 'صيانة معدات التشغيل'],
+          fr: ['Aide tourneur CNC', 'Soudeur qualifié', 'Chaudronnier', 'Monteur industriel'],
+          es: ['Torno y fresadora CNC', 'Soldador industrial', 'Montador de estructuras metálicas', 'Operador de mecanizado estructural']
+        }
+      },
+      {
+        name: { en: 'Automotive Electromechanics', ar: 'كهرباء وميكانيكا السيارات', fr: 'Électromécanique Automobile', es: 'Electromecánica de Vehículos Automóviles' },
+        salidas: {
+          en: ['Car repair mechanic', 'Automotive electrician', 'Vehicle systems technician', 'Auto repair shop helper'],
+          ar: ['ميكانيكي سيارات', 'كهربائي سيارات', 'تقني تشخيص أعطال', 'مساعد ورشة إصلاح'],
+          fr: ['Mécanicien auto', 'Électricien automobile', 'Technicien de diagnostic auto', 'Assistant atelier auto'],
+          es: ['Mecánico de automóviles', 'Electricista de coches', 'Técnico en sistemas de encendido y diagnosis', 'Asistente de taller']
+        }
+      },
+      {
+        name: { en: 'Aesthetics and Hairdressing', ar: 'التجميل وتصفيف الشعر الاحترافي', fr: 'Esthétique et Coiffure', es: 'Estética y Peluquería' },
+        salidas: {
+          en: ['Beauty therapist', 'Professional hairdresser', 'Nail artist assistant', 'Cosmetics salesperson'],
+          ar: ['أخصائي تجميل بشرة', 'مصفف شعر محترف', 'مساعد العناية بالأظافر', 'مبيعات منتجات التجميل'],
+          fr: ['Esthéticienne', 'Coiffeur certifié', 'Prothésiste ongulaire', 'Vendeuse cosmétique'],
+          es: ['Esteticista', 'Peluquero', 'Manicurista', 'Asesora de venta de cosmética']
+        }
+      },
+      {
+        name: { en: 'Care for Dependent People', ar: 'رعاية ومرافقة الأشخاص في حالة تبعية', fr: 'Accompagnement des Personnes Dépendantes', es: 'Atención a Personas en Situación de Dependencia' },
+        salidas: {
+          en: ['Geriatric nursing assistant', 'Home care assistant', 'Daycare tutor help', 'Special needs care agent'],
+          ar: ['مساعد تمريض الشيخوخة', 'مساعد رعاية منزلية', 'مساعد رعاية نهارية', 'مساعد ذوي الاحتياجات الخاصة'],
+          fr: ['Auxiliaire de vie sociale', 'Aide-soignant à domicile', 'Animateur centres dépendance', 'Accompagnateur'],
+          es: ['Cuidador de personas dependientes', 'Auxiliar de ayuda a domicilio', 'Gerocultor', 'Asistente de centros residenciales']
+        }
       }
     ]
   },
@@ -1151,6 +1223,60 @@ export const FORMATIONS: Record<string, Formulation> = {
           fr: ['Mécanicien d’avionique', 'Inspecteur de structure d’aéronefs', 'Technicien de maintenance aéronautique', 'Calibreur d’instruments de vol'],
           es: ['Mecánico de aviónica de aeronaves', 'Técnicas de inspección no destructivas', 'Operativo de hangares y mantenimiento', 'Calibrador de aviónica de vuelo']
         }
+      },
+      {
+        name: { en: 'Assistance to the Directorate', ar: 'مساعد المديرية والإدارة العليا', fr: 'Assistance à la Direction', es: 'Asistencia a la Dirección (antiguo Secretariado)' },
+        salidas: {
+          en: ['Executive assistant', 'Personal secretary of director', 'Administration coordinator', 'Public relations assistant'],
+          ar: ['مساعد تنفيذي', 'سكرتير خاص بالمدير', 'منسق إداري', 'مساعد علاقات عامة'],
+          fr: ['Assistant de direction', 'Secrétaire de direction', 'Coordinateur de bureau', 'Relations publiques'],
+          es: ['Asistente de dirección', 'Secretario ejecutivo', 'Gestor de documentación empresarial', 'Responsable de relaciones institucionales']
+        }
+      },
+      {
+        name: { en: 'Audiovisuals and Shows Production', ar: 'إنتاج السمعي البصري والعروض الحية', fr: 'Production Audiovisuelle et Spectacles', es: 'Producción de Audiovisuales y Espectáculos' },
+        salidas: {
+          en: ['TV/Film production specialist', 'Live events producer coordinator', 'Audio-visual manager', 'Art director help'],
+          ar: ['أخصائي إنتاج سينما وتلفزيون', 'منسق إنتاج الفعاليات الحية', 'مدير المشاريع السمعية البصرية', 'مساعد مخرج فني'],
+          fr: ['Régisseur général adjoint', 'Producteur d’événements live', 'Directeur audiovisuel', 'Assistant scénographie'],
+          es: ['Productor de televisión o cine', 'Coordinador de eventos y festivales', 'Gestor de proyectos audiovisuales', 'Régisseur de espectáculos']
+        }
+      },
+      {
+        name: { en: 'Realization of Audiovisual Projects', ar: 'إخراج وتنفيذ المشاريع السمعية البصرية', fr: 'Réalisation de Projets Audiovisuels', es: 'Realización de Audiovisuales y Espectáculos' },
+        salidas: {
+          en: ['Camera work supervisor', 'Live TV switcher operator', 'Video recording editor', 'Video project director assistant'],
+          ar: ['مشرف عمل الكاميرات', 'مشغل البث التلفزيني المباشر', 'محرر ومصفي الفيديو', 'مساعد مخرج'],
+          fr: ['Opérateur cadreur de plateau', 'Monteur de projets audiovisuels', 'Assistant réalisateur TV', 'Technicien de régie live'],
+          es: ['Realizador de televisión', 'Ayudante de dirección de cine', 'Editor y montador de vídeo profesional', 'Director de cortometrajes y publicidad']
+        }
+      },
+      {
+        name: { en: 'Corporate Image and Photography', ar: 'الصورة الشخصية والمؤسسية والفوتوغرافيا', fr: 'Image Corporelle et Photographie', es: 'Iluminación, Captación y Tratamiento de Imagen' },
+        salidas: {
+          en: ['Professional photographer', 'Lighting technician for film/TV', 'Digital photo retoucher', 'Visual arts planner'],
+          ar: ['مصور فوتوغرافي محترف', 'تقني لإنارة السينما والتلفزيون', 'مصحح ومعدل صور رقمي', 'مخطط فنون بصرية'],
+          fr: ['Photographe de mode/studio', 'Technicien éclairage', 'Retoucheur d’image numérique', 'Directeur de la photographie'],
+          es: ['Fotógrafo profesional de estudio', 'Técnico de iluminación en platós', 'Retocador de imagen digital', 'Reportero gráfico']
+        }
+      },
+      {
+        name: { en: 'Tourism Lodging Management', ar: 'إدارة وتسيير الإقامات السياحية والفنادق', fr: 'Gestion d’Hébergements Touristiques', es: 'Gestión de Alojamientos Turísticos' },
+        salidas: {
+          en: ['Hotel front desk supervisor', 'Housekeeping operations lead', 'Resident booking manager', 'Lodging marketing rep'],
+          ar: ['مشرف استقبال الفندق', 'رئيس عمليات الغرف والخدمات', 'مدير حجوزات سكن سياحي', 'تسويق الإقامات الفندقية'],
+          fr: ['Chef de réception hôtel', 'Gouvernante générale', 'Responsable de réservations', 'Responsable hébergement'],
+          es: ['Jefe de recepción de hotel', 'Gobernante general de hotel', 'Gestor de reservas y revenue', 'Coordinador de alojamientos rurales']
+        }
+      },
+      {
+        name: { en: 'Chemistry Industrial plants operation', ar: 'تشغيل المعامل والصناعات الكيميائية', fr: 'Opération d’Usines de Chimie Industrielle', es: 'Química Industrial' },
+        salidas: {
+          en: ['Chemical process controller', 'Safety head of chemical plant', 'Laboratory analytical supervisor', 'Chemical products designer aid'],
+          ar: ['مراقب العمليات الكيميائية', 'مسؤول السلامة ببيئة كيميائية', 'مشرف تحليلات مختبر كيميائي', 'مساعد مصمم المنتجات الكيميائية'],
+          fr: ['Opérateur de salle de contrôle chimie', 'Responsable HSE usine chimique', 'Superviseur de laboratoire', 'Téchnicien R&D polymères'],
+          es: ['Operario jefe de planta de proceso químico', 'Responsable de seguridad de refinerías', 'Técnico de laboratorio analítico industrial', 'Auxiliar de R&D de polímeros']
+        }
       }
     ]
   },
@@ -1258,6 +1384,33 @@ export const FORMATIONS: Record<string, Formulation> = {
           ar: ['باحث أجهزة رعاية صحية', 'أخصائي نمذجة بدائل حيوية وطبية', 'مهندس برمجيات عيادية وسريرية', 'مشرف صيانة مختبر مستشفى'],
           fr: ['Chercheur équipements médicaux', 'Modélisateur de prothèses virtuelles', 'Ingénieur logiciel clinique', 'Superviseur maintenance hôpital'],
           es: ['Diseñador de equipamiento biomédico', 'Modelador de prótesis inteligentes', 'Ingeniero de software clínico', 'Responsable de mantenimiento hospitalario']
+        }
+      },
+      {
+        name: { en: 'Fine Arts and Humanities Studies', ar: 'الفنون الجميلة والدراسات الإنسانية والتاريخية', fr: 'Beaux-Arts & Humanités', es: 'Grado en Bellas Artes / Historia del Arte' },
+        salidas: {
+          en: ['Visual artist creator', 'Museum curator planner', 'Cultural heritage advisor', 'Historical researcher'],
+          ar: ['فنان تشكيلي بصري', 'منسق معني بالدراسات الفنية', 'مستشار التراث الثقافي', 'باحث تاريخاني تاريخي'],
+          fr: ['Artiste plasticien', 'Conservateur de musée', 'Consultant patrimoine', 'Chercheur en histoire'],
+          es: ['Artista plástico profesional', 'Conservador y comisario de museos', 'Asesor de patrimonio histórico', 'Gestor de colecciones de arte']
+        }
+      },
+      {
+        name: { en: 'School Teaching (Infantil & Primaria)', ar: 'سلك وتكوين أساتذة التعليم والمدرسين', fr: 'Enseignement de l’Éducation Primaire', es: 'Grado en Magisterio de Educación Infantil o Primaria' },
+        salidas: {
+          en: ['School elementary teacher', 'Special needs educator', 'Interactive kid content writer', 'Academy advisor'],
+          ar: ['مدرس مدرسة ابتدائية', 'مربي تربية خاصة للأطفال', 'كاتب محتوى تفاعلي للأطفال', 'مستشار أكاديميات التعليم'],
+          fr: ['Professeur des écoles', 'Éducateur spécialisé primaires', 'Auteur d’outils d’apprentissage', 'Conseiller scolaire'],
+          es: ['Tutor de educación primaria', 'Docente especialista en lenguaje y pedagogía terapéutica', 'Concejalía de educación local', 'Diseñador de materiales pedágogicos']
+        }
+      },
+      {
+        name: { en: 'Industrial Engineering (Electrical & Mechanic)', ar: 'الهندسة والعلوم الصناعية والميكانيكية', fr: 'Ingénierie Industrielle', es: 'Grado en Ingeniería Industrial o Mecánica' },
+        salidas: {
+          en: ['Industrial systems planner', 'Automated lines engineer', 'Machinery product draftsperson', 'Plant manager coordinator'],
+          ar: ['مخطط أنظمة ومصانع صناعية', 'مهندس خطوط تجميع آلية وبماثلة', 'رسام هياكل ومعدات ثقيلة', 'مدير الورش والإنتاج والمصنع'],
+          fr: ['Directeur production mécanique', 'Ingénieur mécanique structures', 'Dessinateur d’équipement ind', 'Ingénieur d’automation'],
+          es: ['Ingeniero proyectista industrial', 'Diseñador de estructuras metálicas', 'Consultor técnico de procesos industriales', 'Jefe de mantenimiento e instalaciones de fábricas']
         }
       }
     ]

@@ -61,6 +61,9 @@ export default function App() {
 
   const [authError, setAuthError] = useState("");
   const [dbStats, setDbStats] = useState<any>(null);
+  const customFormations = dbStats?.customData?.formations || FORMATIONS;
+  const customHousing = dbStats?.customData?.housing || LOGEMENT;
+  const customStudentLife = dbStats?.customData?.studentLife || STUDENT_CITIES_GUIDE;
   const [loadingStats, setLoadingStats] = useState(false);
   const [activePortalTab, setActivePortalTab] = useState<"student" | "creator">("student");
 
@@ -1716,7 +1719,7 @@ export default function App() {
                   </p>
                 </div>
                 <button
-                  onClick={() => downloadFormationsPDF(FORMATIONS[formationTab]?.families || [], formationsSearch, selectedSpecialty, lang)}
+                  onClick={() => downloadFormationsPDF(customFormations[formationTab]?.families || [], formationsSearch, selectedSpecialty, lang)}
                   className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500 hover:text-black border border-amber-500/20 hover:border-transparent text-amber-400 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <span>📄</span>
@@ -1755,7 +1758,7 @@ export default function App() {
               </div>
 
               {(() => {
-                const f = FORMATIONS[formationTab];
+                const f = customFormations[formationTab];
                 return (
                   <div className="space-y-6">
                     {/* General Meta card */}
@@ -2215,7 +2218,7 @@ export default function App() {
                   </p>
                 </div>
                 <button
-                  onClick={() => downloadHousingPDF(LOGEMENT, lang)}
+                  onClick={() => downloadHousingPDF(customHousing, lang)}
                   className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500 hover:text-black border border-amber-500/20 hover:border-transparent text-amber-400 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <span>📄</span>
@@ -2224,7 +2227,7 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                {LOGEMENT.map((l, index) => (
+                {customHousing.map((l, index) => (
                   <div key={index} className="bg-[#070a13] border border-[#1b253b] p-5 rounded-2xl flex flex-col md:flex-row justify-between gap-4 hover:border-amber-500/30 transition-all">
                     <div className="space-y-1.5">
                       <span className="bg-amber-500/5 text-amber-400 border border-amber-500/20 text-[10px] font-mono uppercase px-2 py-0.5 rounded">
@@ -3054,7 +3057,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => {
-                    const activeGuide = STUDENT_CITIES_GUIDE.find(g => g.city === selectedCityLife) || STUDENT_CITIES_GUIDE[0];
+                    const activeGuide = customStudentLife.find(g => g.city === selectedCityLife) || customStudentLife[0];
                     downloadStudentLifePDF(activeGuide, lang);
                   }}
                   className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500 hover:text-black border border-amber-500/20 hover:border-transparent text-amber-400 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
@@ -3066,7 +3069,7 @@ export default function App() {
 
               {/* City selector horizontal bar */}
               <div className="flex gap-2 pb-1 overflow-x-auto scrollbar-thin border-b border-gray-800/80">
-                {STUDENT_CITIES_GUIDE.map((g) => (
+                {customStudentLife.map((g) => (
                   <button
                     key={g.city}
                     onClick={() => setSelectedCityLife(g.city)}
@@ -3084,7 +3087,7 @@ export default function App() {
 
               {/* Active city guide details panel */}
               {(() => {
-                const activeGuide = STUDENT_CITIES_GUIDE.find(g => g.city === selectedCityLife) || STUDENT_CITIES_GUIDE[0];
+                const activeGuide = customStudentLife.find(g => g.city === selectedCityLife) || customStudentLife[0];
                 return (
                   <div className="bg-[#070a13] border border-[#1b253b] p-5 rounded-2xl space-y-5 animate-fadeIn">
                     <div className="flex items-center gap-2 border-b border-gray-800 pb-3">

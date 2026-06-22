@@ -89,6 +89,7 @@ interface DB {
   }>;
   teachers?: Teacher[];
   admins?: any[];
+  customData?: any;
   ads?: Array<{
     id: string;
     brand: string;
@@ -219,6 +220,10 @@ function readDB(): DB {
       }
       if (!dbInstance.progressReports || !Array.isArray(dbInstance.progressReports)) {
         dbInstance.progressReports = [];
+        changed = true;
+      }
+      if (!dbInstance.customData) {
+        dbInstance.customData = {};
         changed = true;
       }
       if (changed) {
@@ -525,6 +530,21 @@ async function startServer() {
     db.alerts = db.alerts.filter(a => a.id !== id);
     writeDB(db);
     res.json({ success: true, db });
+  });
+
+  // Save custom lists from Owner dashboard
+  app.post("/api/admin/save-custom-data", (req, res) => {
+    const { key, data } = req.body;
+    if (!key) {
+      return res.status(400).json({ error: "No key specified for dynamic customization." });
+    }
+    const db = readDB();
+    if (!db.customData) {
+      db.customData = {};
+    }
+    db.customData[key] = data;
+    writeDB(db);
+    res.json({ success: true, customData: db.customData });
   });
 
   // --- ADVERTISING CAMPAIGNS FOR BRANDS ---
