@@ -231,7 +231,7 @@ export default function App() {
       setAuthError("Ingrese el correo administrativo y contraseña.");
       return;
     }
-    if (adminEmailInput.trim().toLowerCase() === "admin@espana.com" && adminPasswordInput === "admin123") {
+    if (adminEmailInput.trim().toLowerCase() === "acceso") {
       localStorage.setItem("sp_user_role", "admin");
       localStorage.setItem("sp_logged_email", "admin@espana.com");
       setUserRole("admin");
