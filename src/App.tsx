@@ -929,7 +929,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-xs font-mono text-gray-400">Bienvenido, <strong>Admin (Dueño)</strong></span>
+            <span className="text-xs font-mono text-gray-400">Bienvenido, <strong>Admin </strong></span>
             <button 
               onClick={handleLogout}
               className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold rounded-xl transition-all cursor-pointer font-sans"
@@ -1190,8 +1190,8 @@ export default function App() {
               ) : (
                 <form onSubmit={handleAdminLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <p className="text-[10px] text-amber-500 uppercase tracking-widest font-mono font-bold font-sans">Consola Única para Colaboradores y Dueño de Plataforma</p>
-                    <p className="text-xs text-gray-400 leading-snug font-sans">Panel administrativo con métricas SAAS, filtros de candidatos a empresas, alertas de conversión e IA Advisor.</p>
+                    <p className="text-[10px] text-amber-500 uppercase tracking-widest font-mono font-bold font-sans">Acceso restringido</p>
+                    <p className="text-xs text-gray-400 leading-snug font-sans">.</p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1221,7 +1221,7 @@ export default function App() {
 
                   <div className="bg-[#070f1a] border border-gray-800/50 p-3 rounded-2xl text-[11px] text-gray-400 flex items-start gap-2 mt-2 font-sans font-medium">
                     <span className="text-amber-500 font-sans">💡</span>
-                    <p>Consejo de desarrollo para el evaluador: Puede conectarse usando el correo de prueba <strong className="text-white">admin@espana.com</strong> y la contraseña <strong className="text-white font-sans">admin123</strong>.</p>
+                    <p></strong>.</p>
                   </div>
 
                   <button
