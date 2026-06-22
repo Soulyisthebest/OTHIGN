@@ -67,7 +67,8 @@ export default function App() {
       level: "A1",
       lives: 10,
       lastLivesRefill: new Date().toDateString(),
-      passedExamsForLevel: {},
+      passedExamsForLevel: {} as Record<string, number>,
+      passedExams_v2: [] as string[],
       levelLocked: false
     };
   });
@@ -85,7 +86,6 @@ export default function App() {
         const data = await res.json();
         setDbStats(data);
         
-        // Match student profile dynamically from server
         if (localStorage.getItem("sp_user_role") === "student" && localStorage.getItem("sp_logged_email")) {
           const matchingEmail = localStorage.getItem("sp_logged_email") || "";
           const matched = data.students.find((s: any) => s.email.toLowerCase() === matchingEmail.toLowerCase());
@@ -100,7 +100,8 @@ export default function App() {
               lives: matched.lives !== undefined ? matched.lives : 10,
               lastLivesRefill: matched.lastLivesRefill || new Date().toDateString(),
               passedExams_v2: matched.passedExams_v2 || [],
-              passedExamsForLevel: matched.passedExamsForLevel || {}
+              passedExamsForLevel: matched.passedExamsForLevel || {},
+              levelLocked: matched.levelLocked || false
             });
           }
         }
@@ -179,7 +180,6 @@ export default function App() {
       return;
     }
 
-    // Phone format validator (e.g., +212612345678, +34612345678, or standard international format)
     const phoneCleaned = studentPhoneInput.trim().replace(/[\s-()]/g, "");
     const phoneRegex = /^\+?\d{8,15}$/;
     if (!studentPhoneInput.trim()) {
@@ -228,7 +228,12 @@ export default function App() {
           goal: data.student.academicGoal,
           xp: data.student.xp,
           streak: data.student.streak || 3,
-          level: data.student.level
+          level: data.student.level,
+          lives: data.student.lives !== undefined ? data.student.lives : 10,
+          lastLivesRefill: data.student.lastLivesRefill || new Date().toDateString(),
+          passedExams_v2: data.student.passedExams_v2 || [],
+          passedExamsForLevel: data.student.passedExamsForLevel || {},
+          levelLocked: data.student.levelLocked || false
         });
       } else {
         setAuthError(data.error || "Fallo en el inicio de sesión del alumno.");
@@ -263,7 +268,6 @@ export default function App() {
     setLoggedStudent(null);
     setAuthError("");
   };
-
 
   // --- Active Tab and Languages ---
   const [lang, setLang] = useState<string>("fr");
@@ -324,7 +328,7 @@ export default function App() {
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
     }
-    return [1, 2]; // Default first two steps checked
+    return [1, 2];
   });
 
   useEffect(() => {
@@ -340,7 +344,7 @@ export default function App() {
   const [chatInp, setChatInp] = useState<string>("");
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // --- Text-to-Speech (native browser with high quality Spanish ES-es voices) ---
+  // --- Text-to-Speech ---
   const speakSpanish = (text: string) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
@@ -348,7 +352,6 @@ export default function App() {
     utterance.lang = "es-ES";
     utterance.rate = 0.85;
     
-    // Find a proper Spanish voice if available
     const voices = window.speechSynthesis.getVoices();
     const esVoice = voices.find(v => v.lang.toLowerCase().includes("es-es")) || 
                     voices.find(v => v.lang.toLowerCase().startsWith("es"));
@@ -356,7 +359,6 @@ export default function App() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // Helper for dynamic multi-language text fetching
   const t = (item: any) => {
     if (!item) return "";
     if (typeof item === "object") {
@@ -365,17 +367,14 @@ export default function App() {
     return item;
   };
 
-  // Resolve minimum page for a given CEFR level
   const getMinPage = (lvl: string) => {
     return ["A1", "A2", "B1", "B2", "C1", "C2"].indexOf(lvl) * 50 + 1;
   };
 
-  // Resolve maximum page for a given CEFR level
   const getMaxPage = (lvl: string) => {
     return (["A1", "A2", "B1", "B2", "C1", "C2"].indexOf(lvl) + 1) * 50;
   };
 
-  // Fetch the active topic based on page offset
   const getTopic = (lvl: string, page: number) => {
     const topics = LEVEL_TOPICS[lvl] || LEVEL_TOPICS.A1;
     const minP = getMinPage(lvl);
@@ -383,8 +382,7 @@ export default function App() {
     return topics[index >= 0 ? index : 0];
   };
 
-  // --- API Integrations using Fetch ---
-  // 1. Fetch Lesson Data
+  // Load Lesson Data
   const handleLoadLesson = async (lvl: string, pageNum: number) => {
     setLoadingLesson(true);
     setExAnswers({});
@@ -414,7 +412,6 @@ export default function App() {
         throw new Error("Failed to consult lesson api");
       }
     } catch (e) {
-      // Robust client fallback if server offline or api keys not set yet
       const fallback = getFallbackLessonData(lvl, topic, lang);
       setLessonData(fallback);
       setIsOfflineMode(true);
@@ -423,7 +420,7 @@ export default function App() {
     }
   };
 
-  // 2. Fetch Level advancement exam
+  // Load Level advancement exam
   const handleLoadExam = async (examId: number) => {
     setSelectedExamId(examId);
     setLoadingExam(true);
@@ -454,7 +451,6 @@ export default function App() {
         throw new Error("Exam API down");
       }
     } catch (e) {
-      // Default fallback offline examination
       setExamData(getFallbackExam(selectedLevel, examId, lang));
       setIsOfflineMode(true);
     } finally {
@@ -462,7 +458,7 @@ export default function App() {
     }
   };
 
-  // 3. Generate formatting optimized European-standard Spanish CV
+  // Generate European-standard Spanish CV
   const handleGenerateCV = async () => {
     setCvGenerating(true);
     setCvHtml("");
@@ -480,7 +476,6 @@ export default function App() {
         throw new Error("CV creation service failed");
       }
     } catch (e) {
-      // Simple preview default template output in case API is temporarily waiting
       setCvHtml(`
         <div style="font-family: sans-serif; color: #1e293b; max-width: 600px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
           <h2 style="margin: 0 0 5px 0; color: #1e3a8a; font-size: 24px;">${cvData.name}</h2>
@@ -501,40 +496,30 @@ export default function App() {
     }
   };
 
-  // Download high-quality PDF CV with fictitious disclaimer stamp
   const handleDownloadCVPDF = () => {
     try {
       const doc = new jsPDF();
-      
-      // Page styling background neutral/white
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, 210, 297, "F");
       
-      // Top header band (Deep blue/navy aesthetic)
-      doc.setFillColor(30, 58, 138); // navy #1e3a8a
+      doc.setFillColor(30, 58, 138);
       doc.rect(0, 0, 210, 48, "F");
       
-      // Name
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(22);
       doc.text((cvData.name || "Ejemplo Ficticio").toUpperCase(), 15, 22);
       
-      // Subtitle (Role / Puesto)
-      doc.setTextColor(245, 158, 11); // Amber accent
+      doc.setTextColor(245, 158, 11);
       doc.setFontSize(11);
       doc.text((cvData.role || "Puesto Objetivo").toUpperCase(), 15, 30);
       
-      // Contact Info (Email & City)
       doc.setTextColor(230, 230, 230);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.text(`Contacto: ${cvData.email || "ejemplo@ficticio.com"}  |  Ciudad: ${cvData.city || "Madrid"}  |  Modelo de Referencia Ficticio`, 15, 38);
       
-      // Main Body
       let y = 60;
-      
-      // Section: Perfil Profesional
       doc.setTextColor(30, 58, 138);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
@@ -553,12 +538,10 @@ export default function App() {
       doc.text(splitPerfil, 15, y);
       y += splitPerfil.length * 5 + 8;
       
-      // Section: Formación Académica
       doc.setTextColor(30, 58, 138);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
       doc.text("FORMACIÓN ACADÉMICA", 15, y);
-      
       doc.line(15, y + 2, 195, y + 2);
       y += 8;
       
@@ -569,12 +552,10 @@ export default function App() {
       doc.text(splitEdu, 15, y);
       y += splitEdu.length * 5 + 8;
       
-      // Section: Competencias e Idiomas
       doc.setTextColor(30, 58, 138);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
       doc.text("COMPETENCIAS E IDIOMAS", 15, y);
-      
       doc.line(15, y + 2, 195, y + 2);
       y += 8;
       
@@ -585,12 +566,10 @@ export default function App() {
       doc.text(splitSkills, 15, y);
       y += splitSkills.length * 5 + 8;
       
-      // Section: Experiencia Práctica
       doc.setTextColor(30, 58, 138);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
       doc.text("EXPERIENCIA PRÁCTICA (Muestras de ejemplo)", 15, y);
-      
       doc.line(15, y + 2, 195, y + 2);
       y += 8;
       
@@ -601,7 +580,6 @@ export default function App() {
       doc.text(splitExp, 15, y);
       y += splitExp.length * 5 + 15;
       
-      // Fictitious disclaimer stamp at the bottom
       doc.setDrawColor(220, 20, 60);
       doc.setLineWidth(0.5);
       doc.rect(15, y, 180, 22);
@@ -623,19 +601,16 @@ export default function App() {
     }
   };
 
-  // Trigger lesson load whenever selected level or page changes
   useEffect(() => {
     handleLoadLesson(selectedLevel, currentPage);
   }, [selectedLevel, currentPage]);
 
-  // Scroll to bottom of chat list whenever a new message is added
   useEffect(() => {
     if (chatBottomRef.current) {
       chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [chats]);
 
-  // Handle local exercise checking
   const handleVerifyExercise = (index: number, answerText: string, correctSpec: any, type: string) => {
     if (!answerText || answerText.trim() === "") return;
     let isCorrect = false;
@@ -645,7 +620,7 @@ export default function App() {
       isCorrect = Number(answerText) === Number(correctSpec);
       feedback = isCorrect 
         ? "🎉 ¡CORRECTO! ¡Excelente razonamiento!" 
-        : `❌ incorrecto. La respuesta formal correcta es: ${lessonData?.practice[index]?.options?.[correctSpec]}`;
+        : `❌ Incorrecto. La respuesta formal correcta es: ${lessonData?.practice[index]?.options?.[correctSpec]}`;
     } else if (type === "fill-blank") {
       isCorrect = answerText.trim().toLowerCase() === String(correctSpec).toLowerCase();
       feedback = isCorrect 
@@ -671,7 +646,6 @@ export default function App() {
     }
   };
 
-  // Handle Level Advancement Exam compilation
   const handleAnswerExam = (qIndex: number, optionIndex: number) => {
     setExamAnswers(prev => ({ ...prev, [qIndex]: optionIndex }));
   };
@@ -686,7 +660,7 @@ export default function App() {
     });
 
     const passRatio = correctCount / (examData.questions || []).length;
-    const passed = passRatio >= 0.6; // Pass at 60%
+    const passed = passRatio >= 0.6;
 
     setExamScore(correctCount);
     setExamPassed(passed);
@@ -694,7 +668,6 @@ export default function App() {
 
     setProfile(prev => {
       const today = new Date().toDateString();
-      // Auto-refill lives daily (+3 per day, max 10)
       let currentLives = prev.lives !== undefined ? prev.lives : 10;
       let lastRefill = prev.lastLivesRefill || today;
       if (lastRefill !== today) {
@@ -709,7 +682,6 @@ export default function App() {
           ? currentPassed
           : [...currentPassed, examKey];
 
-        // Count passed exams for current level
         const passedForLevel = prev.passedExamsForLevel || {};
         const levelPassedCount = (passedForLevel[selectedLevel] || 0);
         const alreadyCounted = currentPassed.includes(examKey);
@@ -719,7 +691,6 @@ export default function App() {
         const allLevels = ["A1", "A2", "B1", "B2", "C1", "C2"];
         const currentIdx = allLevels.indexOf(prev.level);
 
-        // Level up if 3 exams passed at current level
         if (selectedLevel === prev.level && newLevelCount >= 3 && currentIdx < allLevels.length - 1) {
           const nextLevel = allLevels[currentIdx + 1];
           setSelectedLevel(nextLevel);
@@ -744,7 +715,6 @@ export default function App() {
           };
         }
       } else {
-        // Failed exam: -3 lives
         const newLives = Math.max(0, currentLives - 3);
         return {
           ...prev,
@@ -755,7 +725,6 @@ export default function App() {
     });
   };
 
-  // Community Chat action
   const handleSendChatChatroom = async () => {
     if (!chatInp.trim()) return;
     const originalText = chatInp;
@@ -764,7 +733,6 @@ export default function App() {
     const userName = loggedStudent ? loggedStudent.name : "Invitado";
 
     try {
-      // 1. Post student message to real DB
       const resPost = await fetch("/api/community/post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -774,15 +742,13 @@ export default function App() {
         })
       });
       if (resPost.ok) {
-        fetchStats(); // Dynamic refetch
-        // Student receives +5 XP for contributing active conversation to the board
+        fetchStats();
         setProfile(p => ({ ...p, xp: p.xp + 5 }));
       }
     } catch (e) {
       console.error("Error posting to database chatroom:", e);
     }
 
-    // AI Language correction / hints logic
     const lower = originalText.toLowerCase().trim();
     let fallbackTip = "";
 
@@ -812,7 +778,6 @@ export default function App() {
         const { tip } = await response.json();
         if (tip) {
           setTimeout(async () => {
-            // Post AI Tip to the community DB too!
             await fetch("/api/community/post", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -828,10 +793,9 @@ export default function App() {
         }
       }
     } catch (e) {
-      console.error("Gemini correction error, using robust offline fallback:", e);
+      console.error("Gemini correction error, using fallback:", e);
     }
 
-    // Trigger feedback tip
     if (fallbackTip) {
       setTimeout(async () => {
         await fetch("/api/community/post", {
@@ -845,7 +809,6 @@ export default function App() {
         fetchStats();
       }, 930);
     } else {
-      // Trigger a lovely student response to keep interactions warm and dynamic
       setTimeout(async () => {
         const studentReplies = [
           "¡Hola! Bienvenido a la comunidad. ¡Mucho ánimo con tu aprendizaje!",
@@ -870,19 +833,13 @@ export default function App() {
     }
   };
 
-  const handleBookTutor = (name: string) => {
-    alert(`✅ Reserva Registrada con Éxito\n\nProfesor: ${name}\n\nUn correo electrónico con el enlace de la reunión de Zoom para coordinar su sesión ha sido enviado.`);
-  };
-
   const handleDownloadCityPDF = (cityObj: typeof STUDENT_CITIES_GUIDE[0]) => {
     try {
       const doc = new jsPDF();
-      
-      // Page styling background slate
-      doc.setFillColor(12, 18, 34); // deep slate #0c1222
+      doc.setFillColor(12, 18, 34);
       doc.rect(0, 0, 210, 297, "F");
       
-      doc.setTextColor(245, 158, 11); // Amber
+      doc.setTextColor(245, 158, 11);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(22);
       doc.text("SPAIN STUDY PORTAL", 105, 35, { align: "center" });
@@ -895,8 +852,7 @@ export default function App() {
       doc.setLineWidth(1);
       doc.line(20, 56, 190, 56);
       
-      // Box 1: Student Events
-      doc.setFillColor(27, 37, 59); // subtle gray-blue
+      doc.setFillColor(27, 37, 59);
       doc.rect(20, 68, 170, 48, "F");
       
       doc.setTextColor(245, 158, 11);
@@ -910,11 +866,10 @@ export default function App() {
       const splitEvents = doc.splitTextToSize(eventsText, 160);
       doc.text(splitEvents, 25, 84);
       
-      // Box 2: Meeting Locals & Friends
       doc.setFillColor(27, 37, 59);
       doc.rect(20, 126, 170, 48, "F");
       
-      doc.setTextColor(52, 211, 153); // emerald green
+      doc.setTextColor(52, 211, 153);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.text("2. INTEGRATION & MAKING LOCAL FRIENDS", 25, 134);
@@ -926,11 +881,10 @@ export default function App() {
       const splitFriends = doc.splitTextToSize(friendsText, 160);
       doc.text(splitFriends, 25, 142);
       
-      // Box 3: Smart Supermarket Savings index
       doc.setFillColor(27, 37, 59);
       doc.rect(20, 184, 170, 48, "F");
       
-      doc.setTextColor(96, 165, 250); // soft blue
+      doc.setTextColor(96, 165, 250);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.text("3. SUPERMARKET RATINGS & BUDGETING", 25, 192);
@@ -942,7 +896,6 @@ export default function App() {
       const splitMarket = doc.splitTextToSize(marketText, 160);
       doc.text(splitMarket, 25, 200);
 
-      // Map info footer
       doc.setTextColor(150, 150, 150);
       doc.setFontSize(8.5);
       doc.text("Generated via Spain Study Student Portal. Verify live schedule and locations continuously.", 105, 260, { align: "center" });
@@ -1010,7 +963,6 @@ export default function App() {
           </div>
 
           <div className="bg-[#0b1222] border-2 border-[#1c2e4f] rounded-3xl overflow-hidden shadow-2xl">
-            {/* Tab switchers */}
             <div className="flex border-b border-[#1c2e4f] bg-[#080d1a]">
               <button
                 type="button"
@@ -1028,7 +980,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Portal Tab content */}
             <div className="p-6 sm:p-8">
               {authError && (
                 <div className="mb-6 p-4 bg-red-500/10 border-2 border-red-500/20 rounded-2xl text-xs text-red-500 font-medium font-sans">
@@ -1139,7 +1090,6 @@ export default function App() {
                             onChange={(e) => {
                               const val = e.target.value;
                               setStudentCountryInput(val);
-                              // Auto sync current location on select
                               setStudentCurrentCountryInput(val);
                             }}
                             className="w-full bg-[#070a13] border border-gray-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500 font-sans"
@@ -1257,7 +1207,7 @@ export default function App() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1.5 font-sans font-sans">Correo del Administrador</label>
+                      <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1.5 font-sans">Correo del Administrador</label>
                       <input
                         type="email"
                         placeholder="correo@ejemplo.com"
@@ -1268,7 +1218,7 @@ export default function App() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1.5 font-sans col-span-1">Contraseña Maestra</label>
+                      <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1.5 font-sans">Contraseña Maestra</label>
                       <input
                         type="password"
                         placeholder="••••••••"
@@ -1279,8 +1229,6 @@ export default function App() {
                       />
                     </div>
                   </div>
-
-
 
                   <button
                     type="submit"
@@ -1298,7 +1246,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-height-screen bg-[#070a13] text-gray-200 flex flex-col font-sans select-none antialiased">
+    <div className="min-h-screen bg-[#070a13] text-gray-200 flex flex-col font-sans select-none antialiased">
       
       {/* HEADER BANNER */}
       <header className="sticky top-0 z-50 bg-[#0c1222] border-b border-[#1b253b] px-4 py-3 flex items-center justify-between flex-wrap gap-3 shadow-lg">
@@ -1307,7 +1255,7 @@ export default function App() {
             🇪🇸
           </div>
           <div>
-            <h1 className="font-bold text-lg tracking-tight text-white flex items-center gap-2 font-sans font-medium">
+            <h1 className="font-bold text-lg tracking-tight text-white flex items-center gap-2 font-sans">
               Spain Study Portal
               {loggedStudent ? (
                 <span className="bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[9px] font-mono tracking-widest px-2 py-0.5 rounded uppercase">
@@ -1450,7 +1398,7 @@ export default function App() {
                   onChange={(e) => setProfile(prev => ({ ...prev, goal: e.target.value }))}
                   className="w-full bg-[#070a13] border border-[#232f4e] rounded-lg text-xs p-2 text-white outline-none focus:border-amber-500"
                 >
-                  <option value="FP Grado Superior">FP Grado Superior (2 ans)</option>
+                  <option value="FP Grado Superior">FP Grado Superior (2 años)</option>
                   <option value="FP Grado Medio">FP Grado Medio (2 ans)</option>
                   <option value="Universidad (Grado)">Estudios Universitarios (Grado)</option>
                   <option value="Máster Universitario">Máster Universitario (60 ECTS)</option>
@@ -1461,7 +1409,7 @@ export default function App() {
               <div className="p-3 bg-[#070a13] border border-[#1b253b] rounded-xl text-[11px] text-gray-400 leading-relaxed font-sans mt-2">
                 <span className="text-amber-400 font-bold block mb-1">🎯 {lang === "ar" ? "توجيه ذكي" : "Advice for you"}</span>
                 {profile.goal.includes("FP") 
-                  ? (lang === "ar" ? "للتسجيل في التكوين المهني FP، ننصحك بالتقديم السريع على معادلة شهادة البكالوريا Homologación لوزارة التربية، تستغرق المعالجة من 6 إلى 12 شهراً." :
+                  ? (lang === "ar" ? "للتسجيل in التكوين المهني FP، ننصحك بالتقديم السريع على معادلة شهادة البكالوريا Homologación لوزارة التربية، تستغرق المعالجة من 6 إلى 12 شهراً." :
                      "Pour démarrer un programme de Formation Professionnelle FP, préparez en priorité l'homologation de votre diplôme de Baccalauréat auprès du Ministère espagnol.")
                   : (lang === "ar" ? "للدراسة بالجامعة، ابدأ بالاتصال بـ UNEDasiss لإرسال درجاتك واجتياز مواد PCE الاختيارية لرفع معدل القبول." :
                      "Pour l'admission directe en Licence, vous devez passer les examens PCE de Selectividad via l'organisme UNEDasiss.")
@@ -1503,7 +1451,7 @@ export default function App() {
 
               {/* Sequenced Roadmap list */}
               <div className="relative pl-6 border-l border-gray-800 space-y-8 my-4">
-                {ROADMAP_STEPS.map((step, i) => {
+                {ROADMAP_STEPS.map((step) => {
                   const isCompleted = completedSteps.includes(step.n);
                   const toggleStep = () => {
                     if (isCompleted) {
@@ -1515,7 +1463,6 @@ export default function App() {
 
                   return (
                     <div key={step.n} className="relative">
-                      {/* Interactive round pointer (Clickable checkoff shortcut) */}
                       <button 
                         onClick={toggleStep}
                         title={isCompleted ? "Marcar como pendiente" : "Marcar como completado"}
@@ -1532,7 +1479,7 @@ export default function App() {
                         onClick={toggleStep}
                         className={`p-4 rounded-xl shadow-sm transition-all border cursor-pointer select-none ${
                           isCompleted 
-                            ? 'bg-[#0c1a23] border-emerald-550/30' 
+                            ? 'bg-[#0c1a23] border-emerald-500/20' 
                             : 'bg-[#070a13] border-[#1b253b] hover:border-amber-500/30'
                         }`}
                       >
@@ -1560,7 +1507,7 @@ export default function App() {
                         <p className="text-xs text-gray-400 mt-2 leading-relaxed">{t(step.sub)}</p>
                         
                         <div className="flex gap-1.5 flex-wrap mt-3">
-                          {step.tags[lang]?.map((tg, idx) => (
+                          {step.tags[lang as "es" | "fr" | "ar" | "en"]?.map((tg, idx) => (
                             <span key={idx} className="bg-gray-800/60 border border-gray-700/50 text-gray-400 text-[10px] px-2 py-0.5 rounded font-mono">
                               {tg}
                             </span>
@@ -1589,7 +1536,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Country Tabs select menu */}
               <div className="flex gap-2 flex-wrap bg-[#070a13] p-1 border border-gray-800/80 rounded-2xl mb-6">
                 {Object.entries(VISA_DATA).map(([key, value]) => (
                   <button
@@ -1602,9 +1548,8 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Selected Country Data Panels */}
               {(() => {
-                const data = VISA_DATA[visaCountry] || VISA_DATA.morocco;
+                const data = (VISA_DATA as any)[visaCountry] || VISA_DATA.morocco;
                 return (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 gap-4">
@@ -1623,7 +1568,7 @@ export default function App() {
                       </h3>
 
                       <div className="space-y-4">
-                        {data.docs.map((doc, idx) => (
+                        {data.docs.map((doc: any, idx: number) => (
                           <div key={idx} className="bg-[#070a13] border border-[#1b253b] p-4 rounded-xl flex items-start gap-3 hover:border-amber-500/25 transition-all">
                             <span className="bg-amber-500/10 text-amber-400 text-xs font-bold h-6 w-6 rounded-lg flex items-center justify-center shrink-0">
                               {idx+1}
@@ -1637,7 +1582,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Pro tip */}
                     <div className="bg-blue-500/5 border border-blue-500/20 p-4 rounded-2xl text-xs text-blue-400 leading-relaxed flex items-start gap-2.5">
                       <Volume2 size={16} className="shrink-0 text-blue-400 mt-0.5" />
                       <div>
@@ -1661,7 +1605,7 @@ export default function App() {
                   {lang === "ar" ? "استكشاف البرامج الدراسية وتكاليفها" : "Formations & Programmes Pratiques"}
                 </h2>
                 <p className="text-xs text-gray-400 mt-1">
-                  {lang === "ar" ? "تفاصيل التكوين المهني والجامعات من حيث القبول والآفاق المهنية" : "Consultez les conditions requises pour chaque niveau : conditions de diplôme ou bourses."}
+                  {lang === "ar" ? "تفاصيل التكوين المهني والجامعات من حيث القبول والآفاق المهنية" : "Consultez les conditions requises para chaque niveau : conditions de diplôme ou bourses."}
                 </p>
               </div>
 
@@ -1673,7 +1617,7 @@ export default function App() {
                       onClick={() => setFormationTab(key)}
                       className={`px-4 py-2 text-xs font-semibold rounded-xl focus:outline-none transition-colors ${formationTab === key ? 'bg-amber-500 text-gray-900 font-bold' : 'text-gray-400 hover:text-white bg-gray-800/40'}`}
                     >
-                      {t(FORMATIONS[key])}
+                      {t((FORMATIONS as any)[key])}
                     </button>
                   ))}
                 </div>
@@ -1696,10 +1640,9 @@ export default function App() {
               </div>
 
               {(() => {
-                const f = FORMATIONS[formationTab];
+                const f = (FORMATIONS as any)[formationTab];
                 return (
                   <div className="space-y-6">
-                    {/* General Meta card */}
                     <div className="p-5 bg-[#070a13] border border-[#1b253b] rounded-2xl flex flex-col md:flex-row justify-between gap-4">
                       <div>
                         <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">{f.tag} Category</span>
@@ -1713,13 +1656,12 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Entry standards */}
                     <div className="p-5 bg-gray-900/40 border border-gray-800 rounded-2xl">
                       <h4 className="text-xs font-bold text-[#94a3b8] uppercase tracking-wider mb-3">
                         {lang === "ar" ? "شروط التسجيل والقبول الإلزامية:" : "Conditions réglementaires pour postuler :"}
                       </h4>
                       <ul className="space-y-2">
-                        {f.access.map((acc, i) => (
+                        {f.access.map((acc: string, i: number) => (
                           <li key={i} className="text-xs text-gray-300 flex items-start gap-2">
                             <span className="text-amber-500 mt-0.5">✔</span>
                             <span>{acc}</span>
@@ -1734,12 +1676,11 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* Available branches and jobs */}
                     {f.families && (() => {
-                      const filteredFamilies = f.families.filter(fam => {
+                      const filteredFamilies = f.families.filter((fam: any) => {
                         const s = formationsSearch.toLowerCase();
                         const nameMatch = t(fam.name).toLowerCase().includes(s);
-                        const salidasMatch = fam.salidas[lang]?.some(sal => sal.toLowerCase().includes(s)) || false;
+                        const salidasMatch = fam.salidas[lang as "es" | "fr" | "ar" | "en"]?.some((sal: string) => sal.toLowerCase().includes(s)) || false;
                         return nameMatch || salidasMatch;
                       });
 
@@ -1763,7 +1704,7 @@ export default function App() {
                              "Spécialités Majeures Recommandées & Débouchés :"}
                           </h4>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {filteredFamilies.map((fam, idx) => (
+                            {filteredFamilies.map((fam: any, idx: number) => (
                               <div 
                                 key={idx} 
                                 onClick={() => setSelectedSpecialty(fam)}
@@ -1779,7 +1720,7 @@ export default function App() {
                                        "Métiers & Profils :"}
                                     </span>
                                     <div className="flex gap-1.5 flex-wrap">
-                                      {fam.salidas[lang]?.map((sal, sIdx) => {
+                                      {fam.salidas[lang as "es" | "fr" | "ar" | "en"]?.map((sal: string, sIdx: number) => {
                                         const isHighlighted = formationsSearch && sal.toLowerCase().includes(formationsSearch.toLowerCase());
                                         return (
                                           <span key={sIdx} className={`text-[10px] px-2 py-1 rounded-lg border transition-colors ${
@@ -1816,7 +1757,6 @@ export default function App() {
               {/* 100-QUESTION FUN CAREER PATH QUIZ */}
               <div id="career-quiz-section" className="mt-8 pt-8 border-t border-[#1b253b] space-y-6">
                 {!quizActive ? (
-                  // START INVITATION CARD
                   <div className="bg-gradient-to-br from-[#0c1222] to-[#12192b] border-2 border-dashed border-amber-500/20 p-6 rounded-2xl text-center space-y-4">
                     <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-xl text-amber-400 animate-pulse">
                       🎯
@@ -1836,7 +1776,6 @@ export default function App() {
                       </p>
                     </div>
 
-                    {/* CONFORT / PRIVACIDAD BANNER GENERAL DE SEGURIDAD CONTRA PREGUNTAS INDESEADAS */}
                     <div className="bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-xl text-left max-w-xl mx-auto space-y-1">
                       <p className="text-[11px] text-emerald-400 font-bold flex items-center gap-1.5">
                         🛡️ {lang === "ar" ? "التزام بالراحة والخصوصية التامة:" : 
@@ -1862,15 +1801,12 @@ export default function App() {
                     </button>
                   </div>
                 ) : quizIndex < 100 ? (
-                  // ACTIVE QUESTION RUNNER
                   (() => {
                     const qObj = HUNDRED_QUESTIONS[quizIndex];
                     const progressVal = Math.round(((quizIndex) / 100) * 100);
-                    const completedCount = quizAnswers.filter(a => a !== -1).length;
                     
                     return (
                       <div className="bg-[#070a13] border border-[#1b253b] p-6 rounded-2xl space-y-5 relative overflow-hidden">
-                        {/* Elegant Progress header */}
                         <div className="flex justify-between items-center text-xs">
                           <span className="font-mono text-gray-500 uppercase tracking-widest text-[9px]">
                             {lang === "ar" ? `قسم: ${qObj.category.toUpperCase()}` : `SECCIÓN DE INTERÉS: ${qObj.category.toUpperCase()}`}
@@ -1880,7 +1816,6 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* Visual Progress Bar */}
                         <div className="w-full bg-gray-800 h-2.5 rounded-full overflow-hidden">
                           <div 
                             className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full transition-all duration-350"
@@ -1888,23 +1823,21 @@ export default function App() {
                           />
                         </div>
 
-                        {/* Display Question Box */}
                         <div className="bg-[#0c1222] border border-gray-800 p-6 rounded-2xl text-center min-h-[100px] flex items-center justify-center animate-fade-in">
                           <p className="text-sm md:text-base font-bold text-white tracking-wide leading-relaxed select-none">
                             {lang === "ar" ? qObj.ar : lang === "fr" ? qObj.fr : lang === "en" ? qObj.en : qObj.es}
                           </p>
                         </div>
 
-                        {/* Interactive Buttons */}
                         <div className="flex flex-col sm:flex-row gap-3">
                           <button
                             onClick={() => {
                               const newAns = [...quizAnswers];
-                              newAns[quizIndex] = 5; // HIGHLY AGREE
+                              newAns[quizIndex] = 5;
                               setQuizAnswers(newAns);
                               setQuizIndex(prev => prev + 1);
                             }}
-                            className="flex-1 py-3 px-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-350 text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                            className="flex-1 py-3 px-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-450 text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
                           >
                             🟢 {lang === "ar" ? "نعم، أوافق بشدة" : lang === "fr" ? "Oui, totalement d'accord" : "Sí, totalmente de acuerdo"}
                           </button>
@@ -1912,7 +1845,7 @@ export default function App() {
                           <button
                             onClick={() => {
                               const newAns = [...quizAnswers];
-                              newAns[quizIndex] = 2; // NEUTRAL
+                              newAns[quizIndex] = 2;
                               setQuizAnswers(newAns);
                               setQuizIndex(prev => prev + 1);
                             }}
@@ -1924,7 +1857,7 @@ export default function App() {
                           <button
                             onClick={() => {
                               const newAns = [...quizAnswers];
-                              newAns[quizIndex] = 0; // DISAGREE
+                              newAns[quizIndex] = 0;
                               setQuizAnswers(newAns);
                               setQuizIndex(prev => prev + 1);
                             }}
@@ -1934,7 +1867,6 @@ export default function App() {
                           </button>
                         </div>
 
-                        {/* Extra controls footer */}
                         <div className="flex justify-between items-center pt-3 border-t border-gray-800 text-[10px] text-gray-500 font-sans">
                           <button
                             disabled={quizIndex === 0}
@@ -1946,10 +1878,8 @@ export default function App() {
 
                           <button
                             onClick={() => {
-                              // Auto responds randomly to remaining questions to let them inspect end report
                               const filled = quizAnswers.map((val, idx) => {
                                 if (idx < quizIndex) return val;
-                                // Randomly 5, 2 or 0
                                 const arr = [0, 2, 5];
                                 return arr[Math.floor(Math.random() * arr.length)];
                               });
@@ -1974,7 +1904,6 @@ export default function App() {
                     );
                   })()
                 ) : (
-                  // QUIZ CONCLUDED - DETAILED DASHBOARD REPORT
                   (() => {
                     let tech = 0, health = 0, business = 0, hospitality = 0, creative = 0;
                     HUNDRED_QUESTIONS.forEach((q, idx) => {
@@ -1988,7 +1917,6 @@ export default function App() {
                       }
                     });
 
-                    // Calculated points max = 20 * 5 = 100 percentage.
                     const scores = [
                       { key: "tech" as const, val: tech, label: CAREER_CATEGORIES.tech, color: "from-blue-600 to-indigo-500", textCol: "text-blue-400" },
                       { key: "health" as const, val: health, label: CAREER_CATEGORIES.health, color: "from-emerald-600 to-green-500", textCol: "text-emerald-400" },
@@ -1997,13 +1925,11 @@ export default function App() {
                       { key: "creative" as const, val: creative, label: CAREER_CATEGORIES.creative, color: "from-purple-600 to-pink-500", textCol: "text-purple-400" }
                     ];
 
-                    // Sort to find dominating career profile
                     const sortedScores = [...scores].sort((a, b) => b.val - a.val);
                     const best = sortedScores[0];
 
                     return (
                       <div className="bg-[#070a13] border-2 border-emerald-500/20 p-6 rounded-2xl space-y-6">
-                        {/* Certificate ribbon header */}
                         <div className="text-center space-y-2">
                           <span className="inline-block text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-full uppercase tracking-widest font-mono font-bold">
                             🎓 {lang === "ar" ? "تقرير التوجيه المهني الشامل" : "Informe de Aptitud Académica & Salidas"}
@@ -2013,7 +1939,6 @@ export default function App() {
                           </h3>
                         </div>
 
-                        {/* Heavy-weight focal card */}
                         <div className="bg-[#0c1222] border border-emerald-500/30 p-5 rounded-2xl relative overflow-hidden space-y-2.5">
                           <div className="absolute right-0 top-0 text-[100px] leading-none text-emerald-500/5 select-none font-extrabold pr-2 pt-1 font-mono">
                             {best.val}%
@@ -2035,7 +1960,6 @@ export default function App() {
                           </p>
                         </div>
 
-                        {/* Category points breakdown */}
                         <div className="space-y-3.5">
                           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">
                             {lang === "ar" ? "توزيع نقاط التوافق حسب كل عائلة مهنية (100% كحد أقصى):" : "Desglose de Compatibilidad por Categorías:"}
@@ -2064,7 +1988,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Retake test action */}
                         <div className="pt-4 border-t border-gray-800 flex justify-center">
                           <button
                             onClick={() => {
@@ -2098,7 +2021,6 @@ export default function App() {
                     {lang === "ar" ? "تأمين التنقل بأقل تكلفة للطلاب دون سن 26 أو 30 عاماً" : "Toutes les offres de transports publics adaptées aux budgets étudiants."}
                   </p>
                 </div>
-                {/* Micro search filter */}
                 <input 
                   type="text" 
                   placeholder="Filtrer par ville..."
@@ -2161,7 +2083,6 @@ export default function App() {
                 ))}
               </div>
 
-              {/* DIRECT PLATFORMS SECTION (Idealista, Fotocasa) */}
               <div className="bg-[#070a13] border border-[#1b253b] p-6 rounded-2xl mt-6 space-y-4">
                 <div>
                   <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
@@ -2174,7 +2095,6 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Idealista Button Link */}
                   <a 
                     href="https://www.idealista.com/" 
                     target="_blank" 
@@ -2192,7 +2112,6 @@ export default function App() {
                     </div>
                   </a>
 
-                  {/* Fotocasa Button Link */}
                   <a 
                     href="https://www.fotocasa.es/" 
                     target="_blank" 
@@ -2211,7 +2130,6 @@ export default function App() {
                   </a>
                 </div>
 
-                {/* HOW THEY WORK / CÓMO FUNCIONAN */}
                 <div className="border-t border-[#1b253b] pt-4">
                   <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2.5">
                     {lang === "ar" ? "كيف تعمل المنصات وتضمن قبول طلبك؟" : "¿Cómo funcionan estas plataformas y cómo buscar con éxito?"}
@@ -2232,1596 +2150,720 @@ export default function App() {
                     <div className="space-y-2 bg-[#0c1222]/40 p-3 rounded-lg border border-gray-800/45">
                       <p>
                         <strong>3. {lang === "ar" ? "تجهيز ملف الملاءة (Solvencia):" : "Dossier de solvabilité :"}</strong>{" "}
-                        {lang === "ar" ? "أعد مسبقًا نسخة من قبولك الجامعي، كشكل لإيجار تأمين الوالدين أو كشوف البنك لتسليمها فورًا قبل قيام غيرك بحجزها." : 
-                         "Préparez à l'avance vos documents d'inscription étudiante, preuve de bourse ou garanties financières de vos parents pour rassurer le loueur."}
-                      </p>
-                      <p>
-                        <strong>4. {lang === "ar" ? "عقد الإقامة المكتوب (Contrato):" : "Contrat de location :"}</strong>{" "}
-                        {lang === "ar" ? "لا يكتمل الحجز إلا بنموذج عقد محكم يذكر فواصل الوديعة (Fianza) لتتمكن من استخدام العقد في التسجيل البلدي (Empadronamiento)." : 
-                         "Exigez toujours un contrat écrit détaillé qui liste le montant de la caution (fianza), nécessaire pour vos démarches administratives."}
+                        {lang === "ar" ? "يطلب الملاك إثباتات مالية (كفالة الوالدين أو منحة). جهّز ملفاتك مترجمة لتسليمها مباشرة لإغلاق الاتفاق بنجاح." :
+                         "Les propriétaires demandent souvent des garanties (garant ou bourse). Préparez vos documents traduits à l'avance pour finaliser rapidement."}
                       </p>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Security and scams warning */}
-              <div className="bg-amber-500/5 border border-amber-500/20 p-5 rounded-2xl mt-4">
-                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                  <AlertTriangle size={15} />
-                  {lang === "ar" ? "التحقق من صحة الإعلانات ومنع الاحتيال:" : 
-                   lang === "fr" ? "Vérification de l'Annonce et Prévention des Arnaques :" : 
-                   lang === "es" ? "Veracidad del Anuncio y Prevención de Estafas:" : 
-                   "Listing Verification & Scam Prevention:"}
-                </h4>
-                <p className="text-xs text-gray-350 leading-relaxed font-sans">
-                  {lang === "ar" ? "يجب على جميع الطلاب التحقق دائمًا وبشكل مباشر من حقيقة الإيجار ووجود العقار على أرض الواقع قبل دفع أي عمولات أو مبالغ مالية لتفادي النصب العقاري الشائع إلكترونيًا." :
-                   lang === "fr" ? "Il est impératif de toujours vérifier minutieusement la véracité des offres de logement en effectuant des visites réelles sur place avant d'effectuer le moindre virement financier." :
-                   lang === "es" ? "Es obligatorio para todos los estudiantes averiguar siempre la veracidad de cualquier anuncio de alquiler de forma exhaustiva para evitar estafas. Nunca transfieras dinero sin verificar antes en persona o contratar con agencias consolidadas." :
-                   "Every student must always verify the actual truthfulness and legitimacy of any housing advertisement in person before making any deposits or signing contracts."}
-                </p>
               </div>
             </div>
           )}
 
-          {/* TAB 6: COMPLETE SPANISH COURSE & VOCAB MANUAL */}
+          {/* TAB 6: SPANISH COURSES & ASSESSMENTS */}
           {tab === "ebook" && (
-            <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl">
+            <div className="space-y-6">
               
-              {/* HEADER CAPTIONS WITH CEFR INDICATORS */}
-              <div className="flex justify-between items-start flex-wrap gap-3 mb-6 border-b border-gray-800 pb-5">
-                <div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-                    <BookOpen className="text-amber-500 animate-pulse" />
-                    {lang === "ar" ? "كتاب الإسبانية الشامل (A1←C2)" : "Manuel d'Espagnol Certifié (Cadre Européen)"}
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {lang === "ar" ? "دروس تفاعلية، نطق صوتي أصلي ومفردات أكاديمية تخدم ملف دراستك" : "300 chapitres interactifs et vocabulaire pratique avec examens réguliers."}
-                  </p>
-                </div>
-
-                <div className="flex gap-2 items-center flex-wrap">
-                  <div className="bg-[#070a13] border border-gray-800/80 p-0.5 rounded-xl flex gap-1">
-                    {["A1", "A2", "B1", "B2", "C1", "C2"].map(lvl => (
+              {/* LEVEL SWAP HEADERS CONTAINER */}
+              <div className="bg-[#0c1222] border border-[#1b253b] p-4 rounded-3xl shadow-md flex items-center justify-between flex-wrap gap-3">
+                <div className="flex gap-1.5 flex-wrap">
+                  {["A1", "A2", "B1", "B2", "C1", "C2"].map(lvl => {
+                    const active = selectedLevel === lvl;
+                    const isUserLevel = profile.level === lvl;
+                    return (
                       <button
                         key={lvl}
-                        type="button"
                         onClick={() => {
                           setSelectedLevel(lvl);
                           setCurrentPage(getMinPage(lvl));
+                          setExamActive(false);
                         }}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-transform focus:outline-none ${selectedLevel === lvl ? 'bg-amber-500 text-[#070a13] scale-105' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 text-xs font-bold font-mono rounded-xl transition-all uppercase flex items-center gap-1.5 cursor-pointer ${
+                          active 
+                            ? 'bg-amber-500 text-gray-950 scale-105 shadow-md' 
+                            : 'bg-[#070a13] text-gray-400 hover:text-white border border-gray-800'
+                        }`}
                       >
-                        {lvl}
+                        <span>{lvl}</span>
+                        {isUserLevel && <span className="text-[9px] bg-emerald-500 text-white px-1 py-0.2 rounded uppercase tracking-tighter">Tu Nivel</span>}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
+                </div>
 
+                <div className="flex items-center gap-3">
                   <button
-                    type="button"
                     onClick={() => {
                       setExamActive(true);
-                      setExamData(null);
+                      handleLoadExam(1);
                     }}
-                    className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-transform active:scale-95 flex items-center gap-1.5 shadow-lg border border-blue-500/30"
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                      examActive 
+                        ? 'bg-amber-500 text-gray-950 border-amber-400' 
+                        : 'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 text-blue-300 border-blue-500/30 hover:border-blue-400'
+                    }`}
                   >
-                    <Award size={13} />
-                    {lang === "ar" ? "اختبارات الترقية (30 امتحان)" : "Examens de Niveau (30 Tests)"}
+                    <span>🏆 {lang === "ar" ? "امتحان ترقية المستوى الرسمي" : "Examen de Ascenso CEFR"}</span>
                   </button>
                 </div>
               </div>
 
-              {/* BOOK PAGINATION NAVIGATOR */}
-              {!examActive && (
-                <div className="bg-[#070a13] border border-gray-800 p-3 rounded-2xl flex items-center justify-between mb-6 shadow-sm">
-                  <button
-                    disabled={currentPage <= getMinPage(selectedLevel)}
-                    value="prev-page"
-                    onClick={() => setCurrentPage(prev => Math.max(getMinPage(selectedLevel), prev - 1))}
-                    className="bg-[#1c2438] hover:bg-gray-800 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1"
-                  >
-                    <ChevronLeft size={14} />
-                    {lang === "ar" ? "السابق" : "Précédent"}
-                  </button>
-
-                  <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-widest text-center px-2">
-                    📖 Pg {currentPage} / 300 · Level {selectedLevel} Topic: {getTopic(selectedLevel, currentPage)}
-                  </span>
-
-                  <button
-                    disabled={currentPage >= getMaxPage(selectedLevel)}
-                    value="next-page"
-                    onClick={() => setCurrentPage(prev => Math.min(getMaxPage(selectedLevel), prev + 1))}
-                    className="bg-[#1c2438] hover:bg-gray-800 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1"
-                  >
-                    {lang === "ar" ? "التالي" : "Suivant"}
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              )}
-
-              {/* ACTIVE EXAMINATION LAYOUT */}
-              {examActive ? (
-                <div className="space-y-6 animate-fadeIn">
-                  {loadingExam ? (
-                    <div className="py-20 flex flex-col items-center justify-center gap-3">
-                      <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-xs text-gray-400 animate-pulse font-sans font-bold">
-                        {lang === "ar" ? `جاري إعداد وتخصيص النموذج ${selectedExamId} من 30 في مستوى ${selectedLevel} عبر الذكاء الاصطناعي...` : `Génération de la version ${selectedExamId} sur 30 du test de niveau ${selectedLevel}...`}
-                      </p>
+              {/* ROUTER PANEL: STANDARD LESSON OR ADVANCEMENT EXAMINATION */}
+              {!examActive ? (
+                // VIEW A: LIVE INTERACTIVE HANDBOOK LESSON
+                <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl space-y-6">
+                  
+                  {/* Paginator header control */}
+                  <div className="flex justify-between items-center bg-[#070a13] p-3 border border-gray-800/80 rounded-2xl flex-wrap gap-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={currentPage === getMinPage(selectedLevel)}
+                        onClick={() => setCurrentPage(p => Math.max(getMinPage(selectedLevel), p - 1))}
+                        className="p-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 rounded-lg text-white font-bold text-xs"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span className="text-xs text-gray-300 font-mono font-bold uppercase">
+                        {lang === "ar" ? `الصفحة ${currentPage} من ${getMaxPage(selectedLevel)}` : `PÁGINA ${currentPage} DE ${getMaxPage(selectedLevel)}`}
+                      </span>
+                      <button
+                        disabled={currentPage === getMaxPage(selectedLevel)}
+                        onClick={() => setCurrentPage(p => Math.min(getMaxPage(selectedLevel), p + 1))}
+                        className="p-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 rounded-lg text-white font-bold text-xs"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
                     </div>
-                  ) : !examData ? (
-                    /* SELECTOR SCREEN FOR 30 DIFFERENT EXAMS */
-                    <div className="bg-[#070a13] border border-[#1b253b] p-6 rounded-2xl space-y-6">
-                      <div className="flex justify-between items-center border-b border-gray-800 pb-4">
-                        <div>
-                          <span className="text-[10px] tracking-widest font-mono text-blue-400 block uppercase font-bold">
-                            {lang === "ar" ? "مقياس الاختيار المطور من SIELE" : "Centre d'Évaluation Officielle SIELE"}
-                          </span>
-                          <h3 className="text-lg font-bold text-white mt-1">
-                            {lang === "ar" ? `الامتحانات الثلاثون لترقية مستوى ${selectedLevel}` : `Les 30 Examens de Niveau ${selectedLevel}`}
+
+                    <div className="text-xs text-amber-400 font-medium tracking-tight">
+                      📖 {lang === "ar" ? "الموضوع:" : "Tema Central:"} <strong className="text-white font-mono">{getTopic(selectedLevel, currentPage)}</strong>
+                    </div>
+
+                    {isOfflineMode && (
+                      <span className="text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded font-mono uppercase font-bold tracking-wider">
+                        Local Handbook Mode
+                      </span>
+                    )}
+                  </div>
+
+                  {loadingLesson ? (
+                    <div className="text-center py-20 space-y-3">
+                      <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-xs text-gray-400 font-mono">Consolidando estructura gramatical e imágenes...</p>
+                    </div>
+                  ) : lessonData ? (
+                    <div className="space-y-6 animate-fade-in">
+                      
+                      {/* Sub-Section 1: Vocabulary Cards */}
+                      <div className="bg-[#070a13] border border-gray-800/70 p-5 rounded-2xl space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            <Volume2 size={15} className="text-amber-500" />
+                            {lang === "ar" ? "مفردات ومصطلحات اليوم مع النطق بالصوت:" : "Vocabulario Clave & Pronunciación Interactiva"}
                           </h3>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setExamActive(false)}
-                          className="text-gray-400 hover:text-white text-xs border border-gray-800 px-3.5 py-1.5 rounded-xl transition-all font-bold"
-                        >
-                          {lang === "ar" ? "العودة للدروس" : "Retour aux leçons"}
-                        </button>
-                      </div>
 
-                      <div className="bg-blue-500/5 border border-blue-500/20 p-5 rounded-2xl leading-relaxed text-xs text-gray-300 font-sans space-y-2">
-                        <p>
-                          🎯 <strong>{lang === "ar" ? "قاعدة التقدم والتخرج الأكاديمي:" : "Règle de progression académique :"}</strong>{" "}
-                          {lang === "ar" ? `لكل مستوى - CEFR - ستجد 30 نموذج امتحان مختلف (كل نموذج يضم 40 سؤالاً progressive). تحتاج إلى اجتياز نموذج واحد فقط بنجاح (بنسبة 60% أي 24/40) لترقية مستواك تلقائياً لـ :` : 
-                           `Chaque niveau CEFR propose 30 versions d'examens strictement différentes de 40 questions chacune. Il vous suffit de réussir un seul des 30 examens (note ≥ 60%, soit 24/40) pour débloquer automatiquement le niveau :`}
-                          {" "}
-                          <span className="bg-emerald-500 text-gray-950 px-2 py-0.5 rounded font-black font-mono inline-block text-[11px] ml-1">
-                            {selectedLevel === "A1" ? "A2" : selectedLevel === "A2" ? "B1" : selectedLevel === "B1" ? "B2" : selectedLevel === "B2" ? "C1" : selectedLevel === "C1" ? "C2" : "C2+ CERTIFIED"}
-                          </span>
-                        </p>
-                        {selectedLevel !== profile.level && (
-                          <div className="text-amber-400 bg-amber-500/5 px-3 py-2 rounded-xl border border-amber-500/20 text-[11px] font-bold flex items-center gap-1.5 mt-2">
-                            <AlertTriangle size={13} />
-                            <span>
-                              {lang === "ar" ? `اسمك مسجل رسمياً حالياً في مستوى (${profile.level}). يمكنك إجراء امتحانات مستوى (${selectedLevel}) للممارسة والرفع من مستواك، لكن الترقية الرسمية تتطلب تقدم مستمر خطوة بخطوة.` :
-                               `Votre inscription actuelle officielle est au niveau (${profile.level}). Vous pouvez réaliser ces tests (${selectedLevel}) pour s'entraîner, mais le passage de niveau nécessite une validation de votre niveau actuel.`}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* ACCESSIBILITY & COMFORT CERTIFICATION */}
-                        <div className="text-emerald-400 bg-emerald-500/5 px-3.5 py-2.5 rounded-xl border border-emerald-500/20 text-[11px] font-sans leading-normal space-y-1 mt-2">
-                          <p className="font-bold flex items-center gap-1 text-[11px]">
-                            🛡️ {lang === "ar" ? "تقييم آمن ومحترم 100%:" : "Évaluation Confortable & Sereine Certifiée :"}
-                          </p>
-                          <p className="text-gray-400 text-[10px] leading-relaxed">
-                            {lang === "ar" ? "نضمن لك أن جميع أسئلة هذا الاختبار تركز كلياً على القواعد والمهارات اللغوية والمهنية. لا نطرح أبداً أي أسئلة شخصية أو محرجة أو مسببة للضيق أو التمييز." :
-                             "Nous certifions que toutes les questions d'évaluation de nos examens se focalisent uniquement sur la compétence linguistique et grammaticale. Aucune question personnelle, inadéquate ou discriminatoire n'est admise."}
-                          </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {(lessonData.vocabulary || []).map((v: any, i: number) => (
+                            <div 
+                              key={i}
+                              onClick={() => speakSpanish(v.es)}
+                              title="Click to hear pronunciation by native voice"
+                              className="bg-[#0c1222] border border-[#1b253b] hover:border-amber-500/30 p-3 rounded-xl flex items-center justify-between cursor-pointer transition-all group"
+                            >
+                              <div>
+                                <span className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors block">{v.es}</span>
+                                <span className="text-[11px] text-gray-400 mt-0.5 block italic">{v.tr}</span>
+                              </div>
+                              <span className="text-xs bg-gray-800 group-hover:bg-amber-500 group-hover:text-gray-900 p-1.5 rounded-lg transition-colors text-gray-400">
+                                🔊
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
-                      {/* 30 Exams Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
-                        {Array.from({ length: 30 }).map((_, idx) => {
-                          const examNum = idx + 1;
-                          const examKey = `${selectedLevel}-${examNum}`;
-                          const isPassed = (profile.passedExams_v2 || []).includes(examKey);
-                          
-                          return (
-                            <div 
-                              key={examNum}
-                              className={`p-4 rounded-xl border flex flex-col justify-between gap-3 transition-transform hover:scale-[1.02] ${
-                                isPassed 
-                                  ? 'bg-[#10b981]/5 border-[#10b981]/25 text-white' 
-                                  : 'bg-[#0c1222] border-[#1f293d] text-gray-300'
-                              }`}
-                            >
-                              <div className="space-y-1">
-                                <div className="flex justify-between items-center font-sans">
-                                  <span className="text-[9px] font-mono text-gray-500 uppercase font-bold">Ref #{examKey}</span>
-                                  {isPassed && (
-                                    <span className="text-emerald-400 bg-emerald-500/25 text-[9px] font-bold font-mono px-1.5 py-0.5 rounded">
-                                      PASSED
-                                    </span>
+                      {/* Sub-Section 2: Grammatical Handbook Content */}
+                      <div className="p-5 bg-gradient-to-b from-gray-900/60 to-gray-900/10 border border-gray-800/60 rounded-2xl leading-relaxed">
+                        <h3 className="text-sm font-extrabold text-white uppercase tracking-wider mb-3 font-sans">
+                          {lang === "ar" ? "الشرح النظري والقواعد المبسطة:" : "Explicación Teórica Gramatical"}
+                        </h3>
+                        <div className="text-xs text-gray-300 space-y-3 markdown-container font-sans">
+                          <ReactMarkdown>{lessonData.grammar || "Contenido de lección cargando..."}</ReactMarkdown>
+                        </div>
+                      </div>
+
+                      {/* Sub-Section 3: Interactive Practice Area */}
+                      {lessonData.practice && lessonData.practice.length > 0 && (
+                        <div className="border-t border-gray-800 pt-5 space-y-4">
+                          <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            <Award size={15} className="text-amber-500" />
+                            {lang === "ar" ? "تمارين تطبيقية فورية كسب النقاط (+15 XP):" : "Retos Prácticos de Consolidación (+15 XP)"}
+                          </h3>
+
+                          <div className="space-y-4">
+                            {lessonData.practice.map((q: any, i: number) => {
+                              const result = exResults[i];
+                              const userAns = exAnswers[i] || "";
+
+                              return (
+                                <div key={i} className="bg-[#070a13] border border-[#1b253b] p-4 rounded-xl space-y-3">
+                                  <p className="text-xs text-gray-200 font-medium">
+                                    <strong>Ejercicio {i + 1}:</strong> {q.question}
+                                  </p>
+
+                                  {q.type === "multiple-choice" ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                      {q.options?.map((opt: string, optIdx: number) => (
+                                        <button
+                                          key={optIdx}
+                                          disabled={!!result}
+                                          onClick={() => {
+                                            setExAnswers(prev => ({ ...prev, [i]: optIdx }));
+                                            handleVerifyExercise(i, String(optIdx), q.correct, "multiple-choice");
+                                          }}
+                                          className={`text-left p-2.5 rounded-lg text-xs transition-colors border cursor-pointer ${
+                                            Number(userAns) === optIdx 
+                                              ? 'bg-amber-500 text-gray-950 font-bold border-amber-400' 
+                                              : 'bg-[#0c1222] text-gray-300 border-gray-800 hover:border-gray-700'
+                                          }`}
+                                        >
+                                          {opt}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="flex gap-2">
+                                      <input 
+                                        type="text"
+                                        placeholder={q.type === "translation" ? "Escribe la traducción aquí..." : "Completa la palabra faltante..."}
+                                        disabled={!!result}
+                                        value={userAns}
+                                        onChange={(e) => setExAnswers(prev => ({ ...prev, [i]: e.target.value }))}
+                                        className="bg-[#0c1222] border border-gray-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-amber-500 flex-1"
+                                      />
+                                      <button
+                                        disabled={!!result || !userAns.trim()}
+                                        onClick={() => handleVerifyExercise(i, userAns, q.correct, q.type)}
+                                        className="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-gray-950 font-extrabold text-xs px-4 py-2 rounded-xl cursor-pointer transition-colors"
+                                      >
+                                        Verificar
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {result && (
+                                    <div className={`p-3 rounded-xl text-xs font-medium font-sans leading-relaxed ${result.ok ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                                      {result.fb}
+                                    </div>
                                   )}
                                 </div>
-                                <h4 className="text-xs font-bold font-mono text-white mt-1">Examen {examNum}</h4>
-                                <p className="text-[10px] text-gray-400 font-sans">
-                                  {lang === "ar" ? "40 سؤال progressive" : "40 questions progressive"}
-                                </p>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => handleLoadExam(examNum)}
-                                className={`w-full py-1.5 text-center rounded-lg text-[10px] font-bold tracking-wide transition-all ${
-                                  isPassed 
-                                    ? 'text-emerald-400 bg-[#10b981]/15 hover:bg-emerald-500 hover:text-[#070a13]' 
-                                    : 'bg-[#2563eb] hover:bg-blue-600 text-white'
-                                }`}
-                              >
-                                {isPassed ? (lang === "ar" ? "إعادة الامتحان" : "Refaire") : (lang === "ar" ? "بدء الامتحان" : "Commencer")}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div className="bg-[#070a13] border border-[#1b253b] p-6 rounded-2xl space-y-6 shadow-inner animate-fadeIn font-sans">
-                      <div className="flex justify-between items-start border-b border-gray-800 pb-4 flex-wrap gap-2">
-                        <div>
-                          <span className="text-[10px] tracking-widest font-mono text-blue-400 block uppercase font-bold flex items-center gap-1.5 flex-wrap">
-                            Official SIELE Scale Verification
-                            {isOfflineMode && (
-                              <span className="text-[9px] bg-amber-500/10 border border-amber-500/30 text-amber-400 px-1.5 py-0.5 rounded font-mono font-bold animate-pulse normal-case">
-                                offline-cache
-                              </span>
-                            )}
-                          </span>
-                          <h3 className="text-base font-bold text-white mt-1 ">{examData.examTitle}</h3>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setExamActive(false)}
-                          className="text-gray-500 hover:text-white text-xs border border-gray-800 px-3 py-1 rounded-lg transition-all"
-                        >
-                          {lang === "ar" ? "إلغاء المراجعة" : "Fermer l'examen"}
-                        </button>
-                      </div>
+                    <div className="text-center py-10 text-xs text-gray-500 font-mono">
+                      Error al estructurar handbook de lección. Cambia de página para reintentar.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // VIEW B: LEVEL ADVANCEMENT EVALUATION ENGINE
+                <div className="bg-[#0c1222] border-2 border-blue-500/30 p-6 rounded-3xl shadow-xl space-y-6">
+                  <div className="flex justify-between items-center flex-wrap gap-3 border-b border-gray-800 pb-4">
+                    <div>
+                      <span className="text-[10px] uppercase font-mono font-bold tracking-widest text-blue-400">CEFR OFFICIAL ADVANCEMENT EXAM</span>
+                      <h3 className="text-lg font-bold text-white mt-1">
+                        {lang === "ar" ? `📋 اختبار الكفاءة لترقية المستوى إلى ${selectedLevel}` : `📋 Examen de Competencia para Certificar Nivel ${selectedLevel}`}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setExamActive(false)}
+                      className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-xl transition-all"
+                    >
+                      ← Volver al Manual
+                    </button>
+                  </div>
 
-                      {/* Tarea-based Navigation Tabs */}
-                      <div className="flex flex-wrap gap-1.5 border-b border-gray-800 pb-3">
-                        {[1, 2, 3, 4, 5].map((tNum) => {
-                          const startIdx = (tNum - 1) * 8;
-                          const endIdx = tNum * 8;
-                          let answeredInTarea = 0;
-                          for (let k = startIdx; k < endIdx; k++) {
-                            if (examAnswers[k] !== undefined) answeredInTarea++;
-                          }
-                          const isActive = activeTarea === tNum;
+                  {loadingExam ? (
+                    <div className="text-center py-20 space-y-3">
+                      <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-xs text-gray-400 font-mono">Generando examen de suficiencia oficial...</p>
+                    </div>
+                  ) : examData ? (
+                    <div className="space-y-6 animate-fade-in">
+                      
+                      {/* Tarea/Section navigation tabs */}
+                      <div className="flex gap-1.5 border-b border-gray-800 pb-2 overflow-x-auto">
+                        {[1, 2, 3].map(tNum => {
+                          const isCurrent = activeTarea === tNum;
                           return (
                             <button
                               key={tNum}
                               type="button"
                               onClick={() => setActiveTarea(tNum)}
-                              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
-                                isActive 
-                                  ? 'bg-amber-500 text-gray-950 border-amber-400 font-extrabold shadow-md' 
-                                  : 'bg-[#0c1222]/80 text-gray-300 border-gray-800/80 hover:bg-[#162038] hover:text-white'
+                              className={`px-4 py-1.5 rounded-lg text-xs font-bold font-mono transition-colors ${
+                                isCurrent 
+                                  ? 'bg-blue-500 text-white font-extrabold shadow-sm' 
+                                  : 'bg-[#070a13] text-gray-400 hover:text-white hover:bg-gray-800/40'
                               }`}
                             >
-                              <span>{lang === "ar" ? `مهمة ${tNum}` : `Tarea ${tNum}`}</span>
-                              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${isActive ? 'bg-amber-600 text-white' : 'bg-gray-900 text-gray-400'}`}>
-                                {answeredInTarea}/8
-                              </span>
+                              Tarea {tNum}
                             </button>
                           );
                         })}
                       </div>
 
-                      {/* Display active Tarea's theoretical explanation / title */}
+                      {/* Filter questions pertaining to active task block */}
                       {(() => {
-                        const descriptions: Record<number, { title: string; desc: string }> = {
-                          1: { title: "Tarea 1: Comprensión escrita y vocabulario inicial (CEFR A1)", desc: "Enfocado en frases cotidianas, carteles informativos públicos directos y vocabulario de nivel base." },
-                          2: { title: "Tarea 2: Frases y rutinas de comunicación interpersonal (CEFR A2)", desc: "Enfocado en interacciones directas, expresiones temporales cotidianas y diferenciación inicial de tiempos pasados." },
-                          3: { title: "Tarea 3: Comprensión argumentativa e hilos del discurso (CEFR B1)", desc: "Enfocado en estructuración de opiniones, hipótesis y concordancia general de tiempos simples y subjuntivo." },
-                          4: { title: "Tarea 4: Estructuras gramaticales complejas y modo subjuntivo (CEFR B2)", desc: "Análisis gramatical riguroso, combinación de preposiciones complejas y matices formales de opinión/duda." },
-                          5: { title: "Tarea 5: Expresiones cultas, ensayos de de opinión y modismos (CEFR C1)", desc: "Análisis estilístico literario u de opinión periodística, modismos idiomáticos castellanos y sintaxis de nivel superior." }
-                        };
-                        const info = descriptions[activeTarea] || descriptions[1];
+                        const targetCategory = activeTarea === 1 ? "comprension-lectura" : activeTarea === 2 ? "estructuras-gramaticales" : "situaciones-reales";
+                        const categoryQuestions = (examData.questions || []).filter((q: any) => q.category === targetCategory);
+
                         return (
-                          <div className="bg-[#0c1222]/40 border border-gray-800/60 p-3 rounded-xl space-y-1">
-                            <h4 className="text-xs font-bold text-amber-400">{info.title}</h4>
-                            <p className="text-[11px] text-gray-450 leading-relaxed font-sans">{info.desc}</p>
+                          <div className="space-y-5">
+                            <div className="p-3.5 bg-blue-500/5 text-blue-400 rounded-xl border border-blue-500/20 text-xs font-sans leading-relaxed">
+                              📌 <strong>Instrucciones Tarea {activeTarea}:</strong>{" "}
+                              {activeTarea === 1 ? "Comprensión de Textos Cortos. Lee atentamente y selecciona el significado más adecuado." :
+                               activeTarea === 2 ? "Estructuras Gramaticales Avanzadas. Completa o reescribe formalmente la frase." :
+                               "Comprensión de Situaciones e Interacciones Cotidianas en España."}
+                            </div>
+
+                            {categoryQuestions.map((q: any) => {
+                              const globalIdx = (examData.questions || []).indexOf(q);
+                              const answeredOpt = examAnswers[globalIdx];
+
+                              return (
+                                <div key={globalIdx} className="bg-[#070a13] border border-gray-800 p-5 rounded-2xl space-y-3">
+                                  <p className="text-xs md:text-sm font-semibold text-white leading-relaxed">
+                                    <span className="text-blue-400 font-mono font-bold mr-1">Q.{globalIdx + 1}</span>
+                                    {q.text}
+                                  </p>
+
+                                  <div className="grid grid-cols-1 gap-2 pt-1 font-sans">
+                                    {q.options?.map((opt: string, optIdx: number) => {
+                                      const isSelected = answeredOpt === optIdx;
+                                      const isCorrect = q.correctIndex === optIdx;
+                                      
+                                      let btnStyle = 'bg-[#0c1222] border-gray-800 text-gray-300 hover:border-gray-700';
+                                      if (examSubmitted) {
+                                        if (isCorrect) btnStyle = 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold';
+                                        else if (isSelected) btnStyle = 'bg-rose-500/20 border-rose-500 text-rose-300';
+                                      } else if (isSelected) {
+                                        btnStyle = 'bg-blue-500/20 border-blue-500 text-blue-300 font-bold';
+                                      }
+
+                                      return (
+                                        <button
+                                          key={optIdx}
+                                          type="button"
+                                          disabled={examSubmitted}
+                                          onClick={() => handleAnswerExam(globalIdx, optIdx)}
+                                          className={`w-full text-left p-3 rounded-xl text-xs border transition-colors cursor-pointer flex items-center justify-between ${btnStyle}`}
+                                        >
+                                          <span>{opt}</span>
+                                          {examSubmitted && isCorrect && <span className="text-emerald-400 font-bold text-xs">✓ Correcta</span>}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })()}
 
-                      {/* Overall Progress Ribbon */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0c1222]/80 border border-gray-800 p-4 rounded-xl text-xs">
-                        <div className="space-y-1">
-                          <span className="text-gray-450">Progreso general del Examen SIELE:</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-32 bg-gray-800 rounded-full h-1.5 overflow-hidden">
-                              <div 
-                                className="bg-emerald-500 h-full transition-all duration-300" 
-                                style={{ width: `${(Object.keys(examAnswers).length / (examData.questions?.length || 40)) * 100}%` }}
-                              ></div>
-                            </div>
-                            <span className="font-mono text-white font-bold">{Object.keys(examAnswers).length} / {examData.questions?.length || 40} contestadas</span>
-                          </div>
-                        </div>
-                        {!examSubmitted && (
-                          <div className="text-[11px] text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20 max-w-sm font-sans">
-                            💡 Conforme avanzas de Tarea, las preguntas se complican. Completa tantas como puedas.
-                          </div>
-                        )}
-                      </div>
+                      {/* Action trigger footer */}
+                      <div className="pt-4 border-t border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <p className="text-xs text-gray-400 font-sans">
+                          {examSubmitted 
+                            ? "Examen evaluado con éxito por el motor de IA." 
+                            : `Preguntas contestadas: ${Object.keys(examAnswers).length} de ${(examData.questions || []).length}`}
+                        </p>
 
-                      {/* Rapid Grid Navigation */}
-                      <div className="bg-[#0c1222]/50 p-3 rounded-xl border border-gray-800 space-y-2">
-                        <span className="text-[10px] uppercase font-mono tracking-wider text-gray-500 block font-bold">Mapa completo de preguntas (Haz clic para saltar a su Tarea)</span>
-                        <div className="grid grid-cols-8 sm:grid-cols-10 md:grid-cols-20 gap-1.5 font-mono">
-                          {Array.from({ length: examData.questions?.length || 40 }).map((_, idx) => {
-                            const qTarea = examData.questions?.[idx]?.tarea || Math.floor(idx / 8) + 1;
-                            const isAnswered = examAnswers[idx] !== undefined;
-                            const isCurrentTarea = qTarea === activeTarea;
-                            const isCorrect = examSubmitted && examAnswers[idx] === examData.questions?.[idx]?.correctIndex;
-                            
-                            let styleClass = "bg-gray-900/40 text-gray-500 border-gray-800/80";
-                            if (isAnswered) {
-                              styleClass = "bg-blue-950/40 text-blue-300 border-blue-500/20";
-                            }
-                            if (isCurrentTarea) {
-                              styleClass = "bg-amber-550/15 text-amber-400 border-amber-500/50 font-bold ring-1 ring-amber-500/40 bg-amber-950/50";
-                            }
-                            if (examSubmitted) {
-                              styleClass = isCorrect 
-                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold" 
-                                : "bg-red-500/20 text-red-400 border-red-500/40 font-bold";
-                            }
-
-                            return (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setActiveTarea(qTarea)}
-                                className={`h-7 text-[10px] font-mono rounded-lg border flex items-center justify-center transition-all hover:opacity-85 ${styleClass}`}
-                                title={`Pregunta ${idx + 1}`}
-                              >
-                                {idx + 1}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="space-y-5 max-h-[500px] overflow-y-auto pr-2">
-                        {(examData.questions || [])
-                          .map((q: any, i: number) => ({ ...q, originalIndex: i }))
-                          .filter((q: any) => (q.tarea || Math.floor(q.originalIndex / 8) + 1) === activeTarea)
-                          .map((q: any) => {
-                            const i = q.originalIndex;
-                            return (
-                              <div key={i} className="p-4 bg-[#0c1222]/80 border border-gray-800 rounded-xl space-y-3">
-                                <h5 className="text-xs font-bold text-gray-200 leading-relaxed grid grid-cols-[25px_1fr] gap-1 font-sans">
-                                  <span className="text-amber-500 font-mono">{i+1}.</span>
-                                  <span>{q.question}</span>
-                                </h5>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-6">
-                                  {q.options.map((opt: string, optIdx: number) => {
-                                    const isSelected = examAnswers[i] === optIdx;
-                                    return (
-                                      <button
-                                        key={optIdx}
-                                        type="button"
-                                        disabled={examSubmitted}
-                                        onClick={() => handleAnswerExam(i, optIdx)}
-                                        className={`text-left p-2.5 rounded-lg text-xs leading-normal border transition-all ${isSelected ? 'bg-amber-500 text-gray-900 font-bold border-amber-400' : 'bg-[#070a13] text-gray-400 border-[#1b253b] hover:border-gray-700'}`}
-                                      >
-                                        {opt}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-
-                                {examSubmitted && (
-                                  <div className={`p-2.5 rounded-lg text-[11px] leading-relaxed mt-2 font-sans ${examAnswers[i] === q.correctIndex ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                                    <strong>{examAnswers[i] === q.correctIndex ? "✔ ¡Correcto!" : `❌ Incorrecto (Correcto: ${q.options[q.correctIndex]})`}</strong>
-                                    {q.tip && <p className="mt-1 opacity-80">{q.tip}</p>}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                      </div>
-
-                      {/* Pagination buttons for Tareas */}
-                      <div className="flex justify-between items-center gap-4 mt-2">
-                        <button
-                          type="button"
-                          disabled={activeTarea === 1}
-                          onClick={() => setActiveTarea(prev => Math.max(1, prev - 1))}
-                          className="bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed font-bold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-1"
-                        >
-                          <ChevronLeft size={14} />
-                          {lang === "ar" ? "المهمة السابقة" : "Tarea anterior"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={activeTarea === 5}
-                          onClick={() => setActiveTarea(prev => Math.min(5, prev + 1))}
-                          className="bg-[#1c2438] hover:bg-[#283452] text-gray-200 disabled:opacity-35 disabled:cursor-not-allowed font-bold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-1"
-                        >
-                          {lang === "ar" ? "المهمة التالية" : "Siguiente tarea"}
-                          <ChevronRight size={14} />
-                        </button>
-                      </div>
-
-                      {!examSubmitted ? (
-                        <button
-                          type="button"
-                          onClick={handleSubmitExam}
-                          className="w-full bg-emerald-500 hover:bg-emerald-600 text-gray-900 font-black py-3 rounded-2xl text-xs uppercase transition-all shadow-md active:scale-95"
-                        >
-                          {lang === "ar" ? "إرسال ورقة الامتحان المصححة" : "Soumettre les réponses de l'examen"}
-                        </button>
-                      ) : (
-                        <div className="p-5 bg-[#0e172a] border border-[#1e293b] rounded-2xl text-center space-y-4 shadow-xl">
-                          <span className="text-xs text-gray-400 uppercase tracking-widest block font-mono">Bilan de l'examen</span>
-                          <h4 className="text-2xl font-black text-white">{examScore} / {examData.questions?.length || 40}</h4>
-                          {examPassed ? (
-                            <div className="space-y-2">
-                              <p className="text-emerald-400 text-xs font-bold leading-relaxed font-sans">
-                                🎉 ¡Aprobado! Felicidades, has verificado tu transición al nivel superior de la escala CEFR. Tu expediente se actualizó con un premio de +150 XP.
-                              </p>
-                            </div>
-                          ) : (
-                            <p className="text-amber-400 text-xs leading-relaxed font-sans">
-                              ⚠️ Transición no habilitada. Requiere un mínimo del 60% para convalidar. ¡No te rindas y vuelve a estudiar los capítulos de vocabulario!
-                            </p>
-                          )}
+                        {!examSubmitted ? (
                           <button
                             type="button"
-                            onClick={() => setExamActive(false)}
-                            className="bg-gray-800 text-gray-200 text-xs font-bold px-5 py-2 rounded-xl border border-gray-700 hover:bg-gray-700 hover:text-white transition-all shadow"
+                            onClick={handleSubmitExam}
+                            disabled={Object.keys(examAnswers).length < (examData.questions || []).length}
+                            className="px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-lg transition-transform"
                           >
-                            Volver a las lecciones
+                            🔒 Entregar y Calificar Examen
                           </button>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="w-full sm:w-auto text-right space-y-2">
+                            <div className="text-sm font-bold text-white">
+                              Resultado:{" "}
+                              <span className={examPassed ? "text-emerald-400" : "text-rose-400"}>
+                                {examScore} / {(examData.questions || []).length} Aciertos ({examPassed ? "APROBADO" : "SUSPENDIDO"})
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 max-w-sm ml-auto">
+                              {examPassed 
+                                ? "🎉 ¡Enhorabuena! Has sumado +100 XP. Si completas 3 exámenes válidos de este nivel, avanzarás de rango de manera automática." 
+                                : "❌ No has alcanzado el 60% mínimo requerido. Has perdido -3 vidas. Repasa el manual interactivo antes de volver a presentarte."}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-xs text-gray-500 font-mono">
+                      Error al renderizar la base del examen de suficiencia.
                     </div>
                   )}
-                </div>
-              ) : (
-                /* LESSON MATERIAL READER WINDOW */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  
-                  {/* Left Column: Native lesson topic, details, audio map */}
-                  <div className="lg:col-span-7 space-y-6">
-                    {loadingLesson ? (
-                      <div className="py-24 flex flex-col items-center justify-center gap-3">
-                        <div className="w-7 h-7 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                        <p className="text-xs text-gray-400">Escribiendo contenido personalizado con IA...</p>
-                      </div>
-                    ) : lessonData ? (
-                      <article className="space-y-6">
-                        
-                        {/* Alphabet module exclusively for Level A1 first page or any Alphabet topic */}
-                        {selectedLevel === "A1" && (currentPage === 1 || getTopic(selectedLevel, currentPage).toLowerCase().includes("alphabet")) && (
-                          <div className="bg-[#070a13] border border-emerald-500/20 p-5 rounded-2xl space-y-4">
-                            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-gray-800 pb-2">
-                              <Volume2 size={13} />
-                              {lang === "ar" ? "الأبجدية الإسبانية التفاعلية والنطق" : 
-                               lang === "fr" ? "Alphabet Espagnol Interactif (Alphabet de base)" :
-                               lang === "es" ? "El Alfabeto Español Interactivo" :
-                               "Interactive Spanish Alphabet (Core letters)"}
-                            </h3>
-                            <p className="text-xs text-gray-400 leading-relaxed font-sans">
-                              {lang === "ar" ? "انقر على الحرف لسماع النطق الإسباني الأصلي. ركز خصوصاً على الحروف ذات النطق المميز مقارنة بالفرنسية أو الإنجليزية." :
-                               lang === "fr" ? "Cliquez sur chaque lettre pour écouter la prononciation correcte. Les lettres marquées en vert diffèrent de l'anglais." :
-                               lang === "es" ? "Haz clic en cada letra para escuchar su pronunciación pura castellana. Se destacan las letras que difieren de otros idiomas." :
-                               "Click each letter to hear its pure Castilian accent. Focus on special sounds highlighted."}
-                            </p>
-
-                            <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                              {ALPHABET_DATA.map((item, idx) => (
-                                <div 
-                                  key={idx}
-                                  onClick={() => speakSpanish(`Letra ${item.n}. Se pronuncia ${item.n}.`)}
-                                  className="p-3 bg-[#0c1222] border border-[#1b253b] hover:border-amber-500/40 rounded-xl cursor-pointer select-none transition-all group active:scale-95 flex flex-col justify-between"
-                                >
-                                  <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                      <span className="text-white font-extrabold text-xl group-hover:text-amber-400">{item.l}</span>
-                                      <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded font-sans tracking-wide">{item.n}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-[10px] mb-2 border-b border-gray-800/65 pb-1">
-                                      <span className="font-mono text-gray-500 font-sans text-[8px] sm:text-[9px]">{item.ph}</span>
-                                      <span className="text-emerald-400 font-bold text-[10px]">{item.ar}</span>
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 leading-snug font-sans text-left min-h-[36px] flex items-center">
-                                      {t(item.desc)}
-                                    </p>
-                                  </div>
-                                  
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      speakSpanish(item.w);
-                                    }}
-                                    className="mt-2 text-[10px] w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 py-1 rounded font-bold hover:bg-emerald-500 hover:text-gray-900 transition-colors flex items-center justify-center gap-1 shrink-0"
-                                  >
-                                    <Volume2 size={10} />
-                                    {item.w}
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="border-t border-gray-800/80 pt-3 flex justify-between items-center text-[10px] text-gray-500">
-                              <span>Voice target: Castilian (es-ES)</span>
-                              <span>*Requires system text-to-speech enabled</span>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between gap-2 flex-wrap pb-1">
-                            <h3 className="text-base font-extrabold text-white">{lessonData.title}</h3>
-                            {isOfflineMode && (
-                              <span className="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 animate-pulse">
-                                📶 {lang === "ar" ? "وضع الكتاب المدرسي المغلق" :
-                                     lang === "fr" ? "Mode Manuel de Cours Offline" :
-                                     lang === "es" ? "Modo Offline Activo" :
-                                     "Offline Textbook Study Mode"}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-300 leading-relaxed font-sans bg-[#070a13] border border-[#1b253b] p-5 rounded-2xl shadow-inner prose prose-invert max-w-none">
-                            <ReactMarkdown
-                              components={{
-                                h3: ({ children }) => <h3 className="text-sm font-bold text-amber-400 mt-4 mb-2 border-b border-gray-800 pb-1">{children}</h3>,
-                                h4: ({ children }) => <h4 className="text-xs font-bold text-white mt-3 mb-1.5">{children}</h4>,
-                                p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
-                                ul: ({ children }) => <ul className="list-disc pl-4 mb-3 space-y-1">{children}</ul>,
-                                ol: ({ children }) => <ol className="list-decimal pl-4 mb-3 space-y-1">{children}</ol>,
-                                li: ({ children }) => <li className="mb-0.5">{children}</li>,
-                                code: ({ children }) => <code className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded font-mono text-[10px]">{children}</code>,
-                                blockquote: ({ children }) => <blockquote className="border-l-4 border-amber-500 pl-3 italic text-gray-400 my-2">{children}</blockquote>,
-                                table: ({ children }) => <div className="overflow-x-auto my-3"><table className="min-w-full border-collapse border border-gray-800 text-[11px]">{children}</table></div>,
-                                th: ({ children }) => <th className="border border-gray-800 bg-gray-900 px-3 py-1.5 text-left font-bold text-white">{children}</th>,
-                                td: ({ children }) => <td className="border border-gray-800 px-3 py-1.5 text-gray-300">{children}</td>,
-                              }}
-                            >
-                              {lessonData.explanation}
-                            </ReactMarkdown>
-                          </div>
-                        </div>
-
-                        {/* Vocabulary List with active native reading */}
-                        {lessonData.vocabulary && lessonData.vocabulary.length > 0 && (
-                          <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-[#94a3b8] uppercase tracking-wider">
-                              {lang === "ar" ? "المفردات والعبارات الرئيسية:" : "Mots Vocabulaires de la leçon :"}
-                            </h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {lessonData.vocabulary.map((voc: any, idx: number) => (
-                                <div 
-                                  key={idx}
-                                  onClick={() => speakSpanish(voc.spanish)}
-                                  className="bg-[#070a13] border border-[#1b253b] p-3 rounded-xl hover:border-amber-500/40 cursor-pointer transition-all active:scale-95 group text-left"
-                                >
-                                  <span className="text-emerald-400 font-bold text-xs flex items-center gap-1.5 group-hover:text-[#34d399]">
-                                    <Volume2 size={13} className="text-emerald-500" />
-                                    {voc.spanish}
-                                  </span>
-                                  <span className="text-[10px] text-gray-400 tracking-wide font-sans mt-1 block font-mono">{voc.dynamicLang}</span>
-                                  {voc.explanation && <p className="text-[10px] text-gray-500 mt-1 leading-relaxed font-sans">{voc.explanation}</p>}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </article>
-                    ) : null}
-                  </div>
-
-                  {/* Right Column: Mini Interactive exercise panel */}
-                  <div className="lg:col-span-5 space-y-4">
-                    <div className="bg-[#070a13] border border-[#1b253b] p-4 rounded-2xl shadow-inner">
-                      <h4 className="text-xs font-bold text-[#94a3b8] uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                        <CheckSquare size={13} className="text-amber-500" />
-                        {lang === "ar" ? "التمارين والأنشطة التفاعلية" : "Pratique d'Intégration Active"}
-                      </h4>
-                      
-                      {loadingLesson ? (
-                        <div className="py-20 text-center text-xs text-gray-500 italic">Generando pruebas adaptativas...</div>
-                      ) : lessonData?.practice ? (
-                        <div className="space-y-4">
-                          {lessonData.practice.map((item: any, idx: number) => {
-                            const result = exResults[idx];
-                            const currentAns = exAnswers[idx] || "";
-
-                            return (
-                              <div key={idx} className="bg-[#0c1222] border border-gray-800/80 p-3.5 rounded-xl space-y-3 shadow-sm hover:border-gray-700 transition-colors">
-                                <div className="flex justify-between items-center border-b border-gray-800/80 pb-1.5">
-                                  <span className="bg-[#1c2438] text-amber-400 text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase">{item.type}</span>
-                                  <span className="text-[10px] text-gray-500">Ejemplo {idx+1}</span>
-                                </div>
-
-                                <p className="text-xs text-gray-200 leading-normal font-sans font-bold">{item.question}</p>
-
-                                {/* Multiple choice selection layout */}
-                                {item.type === "multiple-choice" && (
-                                  <div className="space-y-1.5">
-                                    {item.options?.map((opt: string, optIdx: number) => (
-                                      <label key={optIdx} className="flex items-center gap-2 text-xs text-gray-400 hover:text-white cursor-pointer select-none">
-                                        <input 
-                                          type="radio" 
-                                          name={`ex-mc-${idx}`}
-                                          checked={Number(exAnswers[idx]) === optIdx}
-                                          onChange={() => setExAnswers(prev => ({ ...prev, [idx]: optIdx }))}
-                                          className="text-amber-500 focus:ring-amber-500 h-3.5 w-3.5 accent-amber-500"
-                                        />
-                                        <span>{opt}</span>
-                                      </label>
-                                    ))}
-
-                                    <button 
-                                      onClick={() => handleVerifyExercise(idx, currentAns, item.correctIndex, "multiple-choice")}
-                                      className="w-full bg-[#1c2438] hover:bg-gray-800 text-gray-300 text-[10px] font-bold py-1.5 rounded-lg border border-gray-800 mt-2 hover:text-white"
-                                    >
-                                      {lang === "ar" ? "تحقق من جوابي" : "Vérifier le choix"}
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* Fill in the blanks layout */}
-                                {item.type === "fill-blank" && (
-                                  <div className="space-y-2">
-                                    <input 
-                                      type="text"
-                                      placeholder="Remplir la case..."
-                                      value={currentAns}
-                                      onChange={(e) => setExAnswers(prev => ({ ...prev, [idx]: e.target.value }))}
-                                      className="w-full bg-[#070a13] border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-500 font-mono"
-                                    />
-                                    <button 
-                                      onClick={() => handleVerifyExercise(idx, currentAns, item.blankWord, "fill-blank")}
-                                      className="w-full bg-[#1c2438] hover:bg-gray-800 text-gray-300 text-[10px] font-bold py-1.5 rounded-lg border border-gray-800"
-                                    >
-                                      {lang === "ar" ? "إرسال الكلمة" : "Tester le mot"}
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* Translation test */}
-                                {item.type === "translation" && (
-                                  <div className="space-y-2">
-                                    <input 
-                                      type="text"
-                                      placeholder="Tu traducción en español..."
-                                      value={currentAns}
-                                      onChange={(e) => setExAnswers(prev => ({ ...prev, [idx]: e.target.value }))}
-                                      className="w-full bg-[#070a13] border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-500"
-                                    />
-                                    <button 
-                                      onClick={() => handleVerifyExercise(idx, currentAns, item.correctTranslation, "translation")}
-                                      className="w-full bg-[#1c2438] hover:bg-gray-800 text-gray-300 text-[10px] font-bold py-1.5 rounded-lg border border-gray-800"
-                                    >
-                                      {lang === "ar" ? "تقييم الترجمة بالمصحح" : "Soumettre la traduction"}
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* Conjugation test */}
-                                {item.type === "conjugation" && (
-                                  <div className="space-y-2">
-                                    {item.verb && <span className="text-[10px] text-gray-500 font-mono italic">Verbo: {item.verb}</span>}
-                                    <input 
-                                      type="text"
-                                      placeholder="Forma conjugada..."
-                                      value={currentAns}
-                                      onChange={(e) => setExAnswers(prev => ({ ...prev, [idx]: e.target.value }))}
-                                      className="w-full bg-[#070a13] border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-500"
-                                    />
-                                    <button 
-                                      onClick={() => handleVerifyExercise(idx, currentAns, item.correctAnswer, "conjugation")}
-                                      className="w-full bg-[#1c2438] hover:bg-gray-800 text-gray-300 text-[10px] font-bold py-1.5 rounded-lg border border-gray-800"
-                                    >
-                                      Check Form
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* General open writing test */}
-                                {item.type === "writing" && (
-                                  <div className="space-y-2">
-                                    <textarea 
-                                      placeholder="Escribe un párrafo..."
-                                      rows={2}
-                                      value={currentAns}
-                                      onChange={(e) => setExAnswers(prev => ({ ...prev, [idx]: e.target.value }))}
-                                      className="w-full bg-[#070a13] border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-500"
-                                    />
-                                    <button 
-                                      onClick={() => handleVerifyExercise(idx, currentAns, null, "writing")}
-                                      className="w-full bg-[#1c2438] hover:bg-gray-800 text-gray-300 text-[10px] font-bold py-1.5 rounded-lg border border-gray-800"
-                                    >
-                                      ✨ Calificar con IA
-                                    </button>
-                                  </div>
-                                )}
-
-                                {result && (
-                                  <div className={`p-2.5 rounded-lg text-[10px] leading-relaxed mt-2 ${result.ok ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' : 'bg-amber-500/10 text-amber-400 border border-amber-500/25'}`}>
-                                    {result.fb}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* TAB 7: EXTRA - STUDENT LIFE COMPENDIUM */}
-          {tab === "vie" && (
-            <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl space-y-6">
-              <div className="mb-2">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Compass className="text-amber-500" />
-                  {lang === "ar" ? "دليل المدن الإسبانية والحياة الطلابية" : "Vie Étudiante, Événements & Bons Plans par Ville"}
-                </h2>
-                <p className="text-xs text-gray-400 mt-1">
-                  {lang === "ar" ? "اختر المدينة لعرض الفعاليات، طرق تكوين صداقات، وترتيب أرخص السوبرماركات وتوفير الميزانية:" : "Sélectionnez votre ville d'étude pour découvrir les événements, comment se faire des amis et économiser sur vos courses."}
-                </p>
-              </div>
-
-              {/* City selector horizontal bar */}
-              <div className="flex gap-2 pb-1 overflow-x-auto scrollbar-thin border-b border-gray-800/80">
-                {STUDENT_CITIES_GUIDE.map((g) => (
-                  <button
-                    key={g.city}
-                    onClick={() => setSelectedCityLife(g.city)}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shrink-0 border uppercase tracking-wider ${
-                      selectedCityLife === g.city 
-                        ? 'bg-amber-500 border-amber-500 text-gray-900 scale-102 shadow-lg shadow-amber-500/10' 
-                        : 'bg-[#070a13] border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
-                    }`}
-                  >
-                    <span className="text-sm">{g.flag}</span>
-                    <span>{g.city}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Active city guide details panel */}
-              {(() => {
-                const activeGuide = STUDENT_CITIES_GUIDE.find(g => g.city === selectedCityLife) || STUDENT_CITIES_GUIDE[0];
-                return (
-                  <div className="bg-[#070a13] border border-[#1b253b] p-5 rounded-2xl space-y-5 animate-fadeIn">
-                    <div className="flex items-center gap-2 border-b border-gray-800 pb-3">
-                      <span className="text-2xl">{activeGuide.flag}</span>
-                      <div>
-                        <h3 className="text-base font-extrabold text-white">
-                          {activeGuide.city} — {lang === "ar" ? "دليل الطالب المتكامل" : "Le Guide Complet de l'Étudiant"}
-                        </h3>
-                        <p className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">
-                          {lang === "ar" ? "دليل معيشي محدث وحصري" : "Données locales certifiées pour l'intégration estudiantine"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Section 1: Events */}
-                      <div className="bg-[#0c1222]/80 border border-gray-800/60 p-4 rounded-xl space-y-2">
-                        <span className="text-amber-500 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-                          🎉 {lang === "ar" ? "الفعاليات والأنشطة الطلابية" : "Événements & Intégration"}
-                        </span>
-                        <p className="text-xs text-gray-300 leading-relaxed font-sans">
-                          {activeGuide.events[lang as keyof typeof activeGuide.events] || activeGuide.events.es}
-                        </p>
-                      </div>
-
-                      {/* Section 2: Friends */}
-                      <div className="bg-[#0c1222]/80 border border-gray-800/60 p-4 rounded-xl space-y-2">
-                        <span className="text-emerald-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-                          🤝 {lang === "ar" ? "كيف تجد وتكون صداقات؟" : "Comment faire des amis"}
-                        </span>
-                        <p className="text-xs text-gray-300 leading-relaxed font-sans">
-                          {activeGuide.friends[lang as keyof typeof activeGuide.friends] || activeGuide.friends.es}
-                        </p>
-                      </div>
-
-                      {/* Section 3: Supermarkets & savings */}
-                      <div className="bg-[#0c1222]/80 border border-gray-800/60 p-4 rounded-xl space-y-2">
-                        <span className="text-blue-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-                          🛒 {lang === "ar" ? "ترتيب أرخص المتاجر والتوفير" : "Supermarchés : Classement"}
-                        </span>
-                        <div className="space-y-1.5 font-sans">
-                          <p className="text-[11px] text-[#34d399] font-mono leading-relaxed font-bold">
-                            {activeGuide.supermarkets.ranking[lang as keyof typeof activeGuide.supermarkets.ranking] || activeGuide.supermarkets.ranking.es}
-                          </p>
-                          <p className="text-[10px] text-gray-400 leading-relaxed border-t border-gray-800/60 pt-1.5">
-                            <strong>💡 {lang === "ar" ? "نصيحة الميزانية:" : "Astuce budget :"}</strong> {activeGuide.supermarkets.tips[lang as keyof typeof activeGuide.supermarkets.tips] || activeGuide.supermarkets.tips.es}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-                );
-              })()}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-                <div className="bg-[#070a13] border border-gray-800/80 p-5 rounded-2xl space-y-3">
-                  <h4 className="text-white font-bold text-xs flex items-center gap-2">🛡️ {lang === "ar" ? "التأمين والطوارئ" : "Assurances & Urgences"}</h4>
-                  <ul className="text-xs text-gray-400 space-y-2 leading-relaxed">
-                    <li>• {lang === "ar" ? "تأكد من تفعيل بطاقة التأمين الصحي الخاص بك (Adeslas, Sanitas...) فور وصولك للتغطية الفورية." : "Activez votre carte d'assurance santé privée d'études (Adeslas, Sanitas) dès l'arrivée pour la couverture complète."}</li>
-                    <li>• {lang === "ar" ? "رقم الطوارئ العام الموحد داخل إسبانيا هو 112 (تتوفر إجابات باللغات الأساسية)." : "Le numéro national d'urgence centralisé est le 112, accessible sans carte réseau SIM active."}</li>
-                  </ul>
-                </div>
-
-                <div className="bg-[#070a13] border border-gray-800/80 p-5 rounded-2xl space-y-3">
-                  <h4 className="text-white font-bold text-xs flex items-center gap-2">🏦 {lang === "ar" ? "الخدمات البنكية الملائمة" : "Services de Trésorerie Bancaire"}</h4>
-                  <ul className="text-xs text-gray-400 space-y-2 leading-relaxed">
-                    <li>• {lang === "ar" ? "أفضل الحسابات الخالية من الرسوم للشباب: Cuenta Online BBVA, Cuenta Joven Santander أو N26." : "Les banques numériques recommandées pour l'itinérance gratuite sans commissions mensuelles permanentes sont BBVA Online ou N26."}</li>
-                    <li>• {lang === "ar" ? "الأوراق المطلوبة: جواز سفر ساري، مع شهادة القبول الأكاديمية (Carta de Admisión)." : "Nécessaire : original de votre passeport, justificatif d'inscription éducative ou reçu de paiement."}</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 8: POST-STUDENT EMPLOYMENT OPTIONS */}
-          {tab === "emploi" && (
-            <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl space-y-6">
-              <div className="mb-2">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Briefcase className="text-amber-500" />
-                  {lang === "ar" ? "العمل بعد الدراسة والإقامة" : "Analyse Détaillée des Plateformes d'Emplois en Espagne"}
-                </h2>
-                <p className="text-xs text-gray-400 mt-1">
-                  {lang === "ar" ? "دليل تفصيلي شامل لكيفية وأماكن العثور على عمل في إسبانيا للطلاب والمغتربين:" : "Guide exhaustif sur le fonctionnement de chaque outil pour maximiser votre chance d'insertion réelle."}
-                </p>
-              </div>
-
-              {/* Legal updates block */}
-              <div className="p-4 bg-emerald-500/5 border border-emerald-500/25 rounded-2xl flex items-start gap-3">
-                <CheckCircle className="text-emerald-400 shrink-0 mt-0.5" size={16} />
-                <div className="text-xs text-emerald-400 leading-relaxed">
-                  <strong>💡 {lang === "ar" ? "تعديل قانون الهجرة الأخير للعمل (30 ساعة):" : "Réforme Légale Essentielle / Droit de Travail Automatique :"}</strong>{" "}
-                  {lang === "ar" ? "وفقًا للتحديث الأخير لقانون الهجرة، يحق للطلاب حاملي بطاقة الطالب ممارسة العمل جانبياً وبشكل قانوني لغاية 30 ساعة أسبوعياً بصفة تلقائية بمجرد التسجيل دون الحاجة لطلب تصريح عمل منفصل. يجب أن تتوافق الساعات مع فصول الدراسة." :
-                   "En Espagne, tout étudiant inscrit de façon régulière possède désormais le droit automatique de travailler à temps partiel jusqu'à 30 heures par semaine directement sans démarches patronales lourdes auprès de l'Oficina de Extranjería."}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-[#94a3b8] uppercase tracking-wider">
-                  {lang === "ar" ? "تفاصيل ودليل استخدام منصات التوظيف الرسمية:" : "Guide d'Utilisation des 4 Portails Majeurs pour Trouver du Travail :"}
-                </h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* portal 1: Infojobs */}
-                  <div className="bg-[#070a13] border border-[#1b253b] p-5 rounded-2xl space-y-3 hover:border-amber-500/30 transition-all flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <h5 className="font-extrabold text-sm text-white flex items-center gap-2">
-                          <span className="text-blue-400">❶</span> InfoJobs España
-                        </h5>
-                        <span className="bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[9px] px-2 py-0.5 font-mono rounded">Nº1 GENERALISTAS</span>
-                      </div>
-                      <div className="text-xs text-gray-300 space-y-1.5 font-sans">
-                        <p>
-                          <strong>{lang === "ar" ? "أين تبحث؟" : "Où chercher ?"}</strong>{" "}
-                          {lang === "ar" ? "مثالي لقطاعات خدمة العملاء، إدارة المكاتب، السياحة، المبيعات والخدمات الفندقية." : "Idéal pour l'hôtellerie, service client bilingue, administration et fonctions supports."}
-                        </p>
-                        <p>
-                          <strong>{lang === "ar" ? "كيف تعثر على فرصة وتتميز؟" : "Comment postuler ?"}</strong>{" "}
-                          {lang === "ar" ? "سجل سيرتك الذاتية بتحديث مستمر. الشركات في إسبانيا تستخدم فلاتر الكلمات الدلالية (ATS)، ويجب إدخال مهاراتك بشكل دقيق والمزايدة على العرض فور طرحه." : "Complétez votre profil à 100%. Les recruteurs trient par mots-clés et réactivité. Postulez dès la parution pour rester en haut de la pile."}
-                        </p>
-                      </div>
-                    </div>
-                    <a 
-                      href="https://www.infojobs.net" 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="mt-3 block text-center bg-blue-500/10 hover:bg-blue-500 hover:text-[#070a13] text-blue-400 font-bold text-xs py-2 rounded-xl transition-all"
-                    >
-                      Visitar InfoJobs.net 🔗
-                    </a>
-                  </div>
-
-                  {/* portal 2: Tecnoempleo */}
-                  <div className="bg-[#070a13] border border-[#1b253b] p-5 rounded-2xl space-y-3 hover:border-amber-500/30 transition-all flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <h5 className="font-extrabold text-sm text-white flex items-center gap-2">
-                          <span className="text-emerald-400">❷</span> Tecnoempleo
-                        </h5>
-                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[9px] px-2 py-0.5 font-mono rounded">100% TECNOLOGÍA</span>
-                      </div>
-                      <div className="text-xs text-gray-300 space-y-1.5 font-sans">
-                        <p>
-                          <strong>{lang === "ar" ? "أين تبحث؟" : "Où chercher ?"}</strong>{" "}
-                          {lang === "ar" ? "مخصص حصرياً للبرمجة (React, Java, Node)، تطوير الويب، إدارة الأنظمة، والتدريب المهني الفني (DAW/DAM)." : "Conçu pour les dev, administrateurs réseaux et profils ingénieurs tech ou diplômés du secteur de formation professionnelle (DAM/DAW)."}
-                        </p>
-                        <p>
-                          <strong>{lang === "ar" ? "كيف تعثر على فرصة وتتميز؟" : "Comment postuler ?"}</strong>{" "}
-                          {lang === "ar" ? "ارفق رابط الـ Portfolio الخاص بك على GitHub. تعرض المنصة مقارنة تلقائية لراتب الوظيفة ومستواك الفني بالنسبة للمتقدمين الآخرين." : "Mentionnez vos projets de code personnels et votre compte GitHub. Le site affiche un bilan comparatif de vos compétences par rapport aux concurrents."}
-                        </p>
-                      </div>
-                    </div>
-                    <a 
-                      href="https://www.tecnoempleo.com" 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="mt-3 block text-center bg-emerald-500/10 hover:bg-emerald-500 hover:text-[#070a13] text-emerald-400 font-bold text-xs py-2 rounded-xl transition-all"
-                    >
-                      Visitar Tecnoempleo.com 🔗
-                    </a>
-                  </div>
-
-                  {/* portal 3: Linkedin */}
-                  <div className="bg-[#070a13] border border-[#1b253b] p-5 rounded-2xl space-y-3 hover:border-amber-500/30 transition-all flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <h5 className="font-extrabold text-sm text-white flex items-center gap-2">
-                          <span className="text-sky-400">❸</span> LinkedIn España
-                        </h5>
-                        <span className="bg-sky-500/10 text-sky-400 border border-sky-500/30 text-[9px] px-2 py-0.5 font-mono rounded">CORPORATIVO & RED</span>
-                      </div>
-                      <div className="text-xs text-gray-300 space-y-1.5 font-sans">
-                        <p>
-                          <strong>{lang === "ar" ? "أين تبحث؟" : "Où chercher ?"}</strong>{" "}
-                          {lang === "ar" ? "مثالي للمكاتب متعددة الجنسيات، وظائف الدعم اللغوي (العربية/الفرنسية/الإنجليزية) في مدريد وبرشلونة ومالقة." : "Excellent pour les multinationales, services délocalisés et postes requérant le français, l’arabe ou l’anglais à Madrid/Barcelone."}
-                        </p>
-                        <p>
-                          <strong>{lang === "ar" ? "كيف تعثر على فرصة وتتميز؟" : "Comment postuler ?"}</strong>{" "}
-                          {lang === "ar" ? "تواصل مباشرة مع مسؤولي التوظيف (Talent Acquisition) في إسبانيا عن طريق رسالة قصيرة ومحترفة تشرح فيها جاهزيتك وتصريح العمل 30 ساعة تلقائي." : "Ajoutez directement les recruteurs locaux en précisant dans votre mémo d’invitation que vous détenez le droit automatique de 30h de labeur sur votre pass étudiant."}
-                        </p>
-                      </div>
-                    </div>
-                    <a 
-                      href="https://es.linkedin.com" 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="mt-3 block text-center bg-sky-500/10 hover:bg-sky-500 hover:text-[#070a13] text-sky-400 font-bold text-xs py-2 rounded-xl transition-all"
-                    >
-                      Visitar LinkedIn España 🔗
-                    </a>
-                  </div>
-
-                  {/* portal 4: JobToday */}
-                  <div className="bg-[#070a13] border border-[#1b253b] p-5 rounded-2xl space-y-3 hover:border-amber-500/30 transition-all flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <h5 className="font-extrabold text-sm text-white flex items-center gap-2">
-                          <span className="text-amber-400">❹</span> JobToday España
-                        </h5>
-                        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[9px] px-2 py-0.5 font-mono rounded">EMPLEO RÁPIDO</span>
-                      </div>
-                      <div className="text-xs text-gray-300 space-y-1.5 font-sans">
-                        <p>
-                          <strong>{lang === "ar" ? "أين تبحث؟" : "Où chercher ?"}</strong>{" "}
-                          {lang === "ar" ? "وظائف عاجلة ومؤقتة: مقاهي، توزيع منشورات، خدمات لوجستية، رعاية أطفال ودروس خصوصية." : "Pour dénicher des petits jobs réactifs de week-end : serveurs, livreurs, cours particuliers, surcroît d'activité saisonnier."}
-                        </p>
-                        <p>
-                          <strong>{lang === "ar" ? "كيف تعثر على فرصة وتتميز؟" : "Comment postuler ?"}</strong>{" "}
-                          {lang === "ar" ? "تتميز المنصة بنظام محادثة فوري (Chat) يربطك مباشرة مع صاحب العمل دون تعقيدات السيرة الذاتية الكلاسيكية. كن متواجداً للرد على رسائلهم." : "L'atout est la messagerie intégrée instantanée. Pas de CV complexe requis : discutez à l'écrit directement avec les gérants locaux pour fixer un essai."}
-                        </p>
-                      </div>
-                    </div>
-                    <a 
-                      href="https://jobtoday.com/es" 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="mt-3 block text-center bg-amber-500/10 hover:bg-amber-500 hover:text-[#070a13] text-amber-500 font-bold text-xs py-2 rounded-xl transition-all"
-                    >
-                      Visitar JobToday.com 🔗
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 9: SHARED ARAB-SPANISH COMMUNITY */}
-          {tab === "chat" && (
-            <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl">
-              <div className="mb-4">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <MessageSquare className="text-amber-500 animate-bounce" />
-                  {lang === "ar" ? "المنتدى الجماعي ومجتمع الطلاب" : "Forum de Discussion & Correction Grammaticale IA"}
-                </h2>
-                <p className="text-xs text-gray-400 mt-1">
-                  {lang === "ar" ? "تبادل النصائح مع طبل إسبانيا واحصل على تدقيق ذكي لأخطائك النحوية في اللغة الإسبانية" : "Posez des questions pratiques. Si vous rédigez en espagnol, l'IA Professor vous corrigera."}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Chat feed column */}
-                <div className="lg:col-span-2 bg-[#070a13] border border-[#1b253b] p-4 rounded-2xl flex flex-col h-[400px]">
-                  
-                  {/* Messages list container */}
-                  <div className="flex-1 overflow-y-auto space-y-3.5 pr-1" id="chatroom-messages">
-                    {chats.map(msg => (
-                      <div 
-                        key={msg.id}
-                        className={`flex flex-col max-w-[85%] ${msg.user === "Tú" ? 'ml-auto items-end' : 'mr-auto items-start'}`}
-                      >
-                        <span className="text-[10px] text-gray-500 font-mono mb-0.5 px-1">{msg.user}</span>
-                        <div className={`p-3 rounded-2xl text-xs font-sans leading-relaxed ${msg.system ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300' : msg.user === "Tú" ? 'bg-amber-500 text-gray-900 font-semibold' : 'bg-[#0c1222] border border-[#1b253b] text-gray-300'}`}>
-                          {msg.text}
-                        </div>
-                        <span className="text-[8px] text-gray-600 mt-0.5 px-1">{msg.time}</span>
-                      </div>
-                    ))}
-                    <div ref={chatBottomRef} />
-                  </div>
-
-                  {/* Input field actions */}
-                  <div className="mt-3 pt-3 border-t border-gray-800/80 flex gap-2">
-                    <input 
-                      type="text" 
-                      placeholder={lang === "ar" ? "اكتب رسالة (مثال: yo quiere estudiar en madrid) لتفعيل المصلح التلقائي" : "Rédigez en espagnol (ex: yo tener hambre) pour voir le prof d'IA corriger..."}
-                      value={chatInp}
-                      onChange={(e) => setChatInp(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSendChatChatroom()}
-                      className="flex-1 bg-[#0c1222] border border-[#1b253b] text-xs px-3 py-2.5 rounded-xl text-white outline-none focus:border-amber-500 font-sans"
-                    />
-                    <button
-                      onClick={handleSendChatChatroom}
-                      className="bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold px-4 rounded-xl text-xs transition-transform active:scale-95"
-                    >
-                      ➤
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tutor booking panel */}
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-[#94a3b8] uppercase tracking-wider">
-                    {lang === "ar" ? "مدرسون معتمدون ومساعدة في الترجمة:" : "Professeurs Certifiés Particuliers :"}
-                  </h4>
-                  
-                  {[
-                    { name: "Sra. Leila Alami", av: "👩‍🏫", detail: "Enseignante trilingue espagnol-arabe. Préparation intense aux examens PCE Selectividad." },
-                    { name: "Dr. Karim Belhadj", av: "👨‍🏫", detail: "Spécialiste de la traduction jurée de documents universitaires et lettres de motivation de visa." }
-                  ].map((tut, i) => (
-                    <div key={i} className="bg-[#070a13] border border-[#1b253b] p-4 rounded-xl space-y-3 shadow">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl bg-gray-800 p-1.5 rounded-xl block">{tut.av}</span>
-                        <div>
-                          <h5 className="font-bold text-xs text-white leading-tight">{tut.name}</h5>
-                          <span className="text-[9px] text-amber-500 block">★★★★★ (4.9 Verified)</span>
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-gray-400 font-sans leading-normal">{tut.detail}</p>
-                      <button
-                        onClick={() => handleBookTutor(tut.name)}
-                        className="w-full bg-[#1c2438] hover:bg-gray-800 text-gray-300 font-bold text-[10px] py-2 rounded-lg transition-colors border border-gray-800"
-                      >
-                        {lang === "ar" ? "حجز حصة تجريبية" : "Réserver une session"}
-                      </button>
-                    </div>
-                  ))}
-                  <div className="p-3 bg-[#0a0f1d] text-gray-400 rounded-xl text-[10px] space-y-2 border border-[#1b253b] leading-relaxed">
-                    <p className="font-bold text-amber-400 flex items-center gap-1">
-                      🛡️ {lang === "ar" ? "قيد التسجيل والتدريس:" : 
-                           lang === "fr" ? "Accréditation Administrateur Unique :" : 
-                           lang === "es" ? "Acceso Restringido - Solo Administrador:" : 
-                           "Restricted Access - Administrator Only:"}
-                    </p>
-                    <p className="text-gray-500 text-[9px] leading-relaxed">
-                      {lang === "ar" ? "لا يُسمح لأي طالب بنشر أو إدراج عروض تدرس لغوية. المشرف فقط هو المخول بإضافة وتدقيق عروض مدرسي اللغات لضمان الجودة ومكافحة الاحتيال المالي." :
-                       lang === "fr" ? "Aucun étudiant n'est autorisé à publier une offre de professeur de langue. Seul l'administrateur exclusif a le droit de mettre en ligne des profils académiques." :
-                       lang === "es" ? "Ningún estudiante está autorizado a presentar o publicar una oferta de profesor de idiomas o tutoría. Únicamente el administrador del portal tiene permisos exclusivos para subir ofertas." :
-                       "No student is authorized to upload or post any language tutor or teacher profile. Only the official portal administrator can create or publish tutoring listings to ensure quality."}
-                    </p>
-                    <div className="text-[8px] text-gray-600 border-t border-gray-800 pt-1 font-mono text-center">
-                      Platform preserves a flat 30% safety escrow for dispute protection.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 10: AUTOMATED CURRICULUM VITAE SPANISH BOOSTER */}
+          {/* TAB 7: SPAIN PROFESSIONAL CV MAKER */}
           {tab === "cv" && (
-            <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl space-y-6">
-              <div className="mb-2">
+            <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl">
+              <div className="mb-5">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <FileText className="text-amber-500" />
-                  {lang === "ar" ? "منشئ ومترجم السيرة الذاتية المهنية" : "Modelos de CV Profesional & Generador Automático"}
+                  {lang === "ar" ? "منشئ السيرة الذاتية المهنية لإسبانيا" : "Générateur de Curriculum Vitae - Normes Européennes"}
                 </h2>
                 <p className="text-xs text-gray-400 mt-1">
-                  {lang === "ar" ? "اختر أحد النماذج الـ 15 المعتمدة ثم قم بإنشاء وتنزيل سيرتك الذاتية بتنسيق أوروبي" : "Sélectionnez parmi nos 15 modèles spécialisés de CV espagnol pour remplir l'outil en un clic, o personalizarlo."}
+                  {lang === "ar" ? "أنشئ سيرتك الذاتية المتوافقة مع معايير العمل في إسبانيا بصيغة PDF جاهزة" : "Remplissez vos blocs de compétences pour concevoir un CV espagnol accrocheur."}
                 </p>
-              </div>
-
-              {/* CV EXAMPLES SELECTOR PANEL (15 Job Specialties) */}
-              <div className="bg-[#070a13] border border-[#1b253b] p-4 rounded-2xl">
-                <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  📋 {lang === "ar" ? "15 نموذج سيرة ذاتية جاهز للتعبئة الفورية:" : "15 Ejemplos de Currículum por Especialización (Autorellenables):"}
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  {CV_TEMPLATES.map((tmpl, tIdx) => {
-                    const isSelected = cvData.role === tmpl.data.role;
-                    return (
-                      <button
-                        key={tIdx}
-                        onClick={() => {
-                          setCvData(tmpl.data);
-                          // Reset generated content to let them re-generate
-                          setCvHtml("");
-                        }}
-                        className={`p-2.5 rounded-xl border text-[10px] text-left transition-all leading-snug font-sans relative ${
-                          isSelected 
-                            ? "bg-amber-500/15 border-amber-500 text-amber-350 shadow" 
-                            : "bg-[#0c1222] border-[#1b253b] text-gray-300 hover:border-gray-700 hover:bg-[#12192b]"
-                        }`}
-                      >
-                        <div className="font-bold truncate" title={tmpl.title}>
-                          {lang === "ar" ? tmpl.title.split("(")?.[0] || tmpl.title : tmpl.title}
-                        </div>
-                        <div className="text-[9px] text-gray-500 truncate">{tmpl.enTitle}</div>
-                        {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 w-3 h-3 bg-amber-500 rounded-full flex items-center justify-center">
-                            <span className="text-[8px] text-black font-extrabold font-mono">✓</span>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                {/* ADVANCE NOTE EXPLAINING THAT MODELS ARE FICTITIOUS AND PDF-READY */}
-                <div className="mt-3 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-[11px] text-amber-300/90 leading-relaxed font-sans">
-                  💡 <strong>{lang === "ar" ? "تنبيه هام ومثال توضيحي:" : "Nota de Ejemplo Ficticio:"}</strong>{" "}
-                  {lang === "ar" 
-                    ? "جميع نماذج السير الذاتية الـ 15 المتاحة بالأعلى تحتوي على أسماء وبيانات وخلفيات مهنية 'افتراضية تماماً' للمثال فقط. يمكنك استخدامها كقالب لتعبئة معلوماتك الحقيقية وتحميل النموذج المختار بصيغة PDF فوراً."
-                    : "Todos los 15 modelos de currículum disponibles arriba son ejemplos ilustrativos con experiencias y datos académicos totalmente ficticios para demostración técnica pedagógica. Adapta la plantilla con tu información verídica y descárgala en PDF mediante el botón de descarga."}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                {/* Left panel: Guía y Manual de Redacción de CV */}
-                <div className="bg-[#070a13] border border-[#1b253b] p-5 rounded-2xl space-y-5">
-                  <div className="border-b border-gray-800 pb-3">
-                    <span className="text-[10px] tracking-widest font-mono text-amber-500 block uppercase font-bold">
-                      {lang === "ar" ? "دليل وهيكل السيرة الذاتية في إسبانيا" : "GUÍA Y NORMATIVA DE CV EN ESPAÑA"}
-                    </span>
-                    <h4 className="text-[13.5px] font-extrabold text-white mt-1">
-                      {lang === "ar" ? "القواعد الذهبية لكتابة سيرتك الذاتية المعتمدة:" : "Directrices esenciales para tu Currículum Vitae:"}
-                    </h4>
-                  </div>
-
-                  <div className="space-y-4 font-sans text-xs leading-relaxed text-gray-300">
-                    <div className="bg-[#0c1222]/85 border border-gray-800/80 p-3.5 rounded-xl">
-                      <h5 className="font-bold text-amber-400 mb-1 flex items-center gap-1.5">
-                        <span>📏</span> <span>{lang === "ar" ? "قاعدة الصفحة الواحدة (1 Sola Página)" : "Extensión Máxima (Una Página)"}</span>
-                      </h5>
-                      <p className="text-[11px] text-gray-400 leading-relaxed">
-                        {lang === "ar"
-                          ? "يرفض مسؤولو التوظيف في إسبانيا السير الذاتية الطويلة. احرص على جعل نموذج سيرتك مكثفًا ومنظمًا في صفحة واحدة فقط لضمان قراءته بالكامل."
-                          : "En España, se prefiere rotundamente que el currículum ocupe exactamente una sola página. La síntesis y el orden transmiten alta capacidad organizativa y profesionalidad."}
-                      </p>
-                    </div>
-
-                    <div className="bg-[#0c1222]/85 border border-gray-800/80 p-3.5 rounded-xl">
-                      <h5 className="font-bold text-emerald-400 mb-1 flex items-center gap-1.5">
-                        <span>🚫</span> <span>{lang === "ar" ? "لا داعي للصور الشخصية العشوائية" : "Política sobre Fotos"}</span>
-                      </h5>
-                      <p className="text-[11px] text-gray-400 leading-relaxed">
-                        {lang === "ar"
-                          ? "توصي مبادئ التوظيف الحديثة في أوروبا بعدم إدراج أي صورة شخصية عشوائية لضمان الموثوقية والتقييم العادل لمهاراتك الفنية الحقيقية."
-                          : "El modelo actual prescinde de fotos para favorecer un filtrado objetivo y transparente de tus competencias. Si decides incluir una, debe ser de estudio y sobre fondo blanco."}
-                      </p>
-                    </div>
-
-                    <div className="bg-[#0c1222]/85 border border-gray-800/80 p-3.5 rounded-xl">
-                      <h5 className="font-bold text-blue-400 mb-1 flex items-center gap-1.5">
-                        <span>🌍</span> <span>{lang === "ar" ? "مستويات اللغات الأوروبية المعتمدة (MCER)" : "Acreditación de Idiomas (Marco CEFR)"}</span>
-                      </h5>
-                      <p className="text-[11px] text-gray-400 leading-relaxed">
-                        {lang === "ar"
-                          ? "عند ذكر مهاراتك اللغوية، لا تستخدم أشرطة التقييم المئوية المبهمة. اكتب مستواك الفعلي وفق الإطار الأوروبي المرجعي الموحد للغات مثل: (Español A2, Árabe Nativo)."
-                          : "Evita barras de porcentaje imprecisas. Determina tus competencias lingüísticas utilizando los niveles estandarizados del marco europeo de referencia (A1, A2, B1, B2, C1, C2)."}
-                      </p>
-                    </div>
-
-                    <div className="bg-[#0c1222]/85 border border-gray-800/80 p-3.5 rounded-xl">
-                      <h5 className="font-bold text-[#c084fc] mb-1 flex items-center gap-1.5">
-                        <span>🎓</span> <span>{lang === "ar" ? "المعادلة والشواهد التعليمية المعترف بها" : "Homologación y Títulos Equivalentes"}</span>
-                      </h5>
-                      <p className="text-[11px] text-gray-400 leading-relaxed">
-                        {lang === "ar"
-                          ? "قيد دائماً مسمى شهادتك بما يعادلها رسمياً في منظومة التعليم والتدريب المهني الإسباني (مثل Grado Superior u Homologación en Trámite) لتسهيل فلترتها من قبل الموارد البشرية."
-                          : "Si tu titulación extranjera está en proceso legal, indica siempre 'En trámite de homologación'. Traduce tus estudios al formato equivalente español (Grado, Ciclo Medio o Superior) para que el reclutador entienda tu perfil."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl space-y-2">
-                    <span className="text-[10px] uppercase font-mono text-amber-500 font-bold block">ℹ️ NOTA DE SEGURIDAD DEL PORTAL</span>
-                    <p className="text-[11px] text-gray-400 font-sans leading-relaxed">
-                      {lang === "ar"
-                        ? "هذه الصفحة مخصصة كمعرض أمثلة ريادية معتمدة محمي ضد التعديل لأسباب أمنية. اختر أي وظيفة من القائمة الدوارة in الأعلى وسيقوم النظام بتحديث نموذج السيرة الذاتية المناسب فوراً والذي يمكنك تنزيله كملف PDF رسمي."
-                        : "Dado que el portal restringe la edición de información en vivo para mantener seguros los perfiles, esta sección funciona como un visor de modelos idóneos adaptados a cada sector. Haz clic en las profesiones de arriba y descárgate el PDF de referencia de forma instantánea."}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right panel: High-Fidelity Interactive Two-Column CV visual template */}
-                <div className="space-y-4">
-                  {/* Action row */}
-                  <div className="flex justify-between items-center bg-[#070a13] border border-[#1b253b] p-3 rounded-2xl shrink-0 gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-[#94a3b8] uppercase tracking-wider pl-1 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      {lang === "ar" ? "معاينة النموذج المعتمد" : "Vista Previa de CV Profesional"}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleDownloadCVPDF}
-                        title="Descargar este modelo de CV en PDF"
-                        className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-gray-950 text-[10px] font-extrabold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                      >
-                        <span>📥 Descargar PDF (Modelo)</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          const nameLine = `Nombre: ${cvData.name}\n`;
-                          const contactLine = `Contacto / Email: ${cvData.email}\nUbicación: ${cvData.city}\n\n`;
-                          const roleLine = `PUESTO DESEADO: ${cvData.role}\n\n`;
-                          const profileLine = `PERFIL PERSONAL:\nJoven con alta motivación para incorporarse al sector en el cargo de ${cvData.role}. Excelente adaptabilidad y disposición de aprendizaje rápido en España.\n\n`;
-                          const eduLine = `FORMACIÓN ACADÉMICA:\n${cvData.edu}\n\n`;
-                          const skillsLine = `COMPETENCIAS:\n${cvData.skills}\n\n`;
-                          const expLine = `EXPERIENCIA:\n${cvData.exp}\n\n`;
-                          const fullTxt = nameLine + contactLine + roleLine + profileLine + eduLine + skillsLine + expLine;
-                          navigator.clipboard.writeText(fullTxt);
-                          setCvCopied(true);
-                          setTimeout(() => setCvCopied(false), 2000);
-                        }}
-                        className="bg-[#1c2438] hover:bg-gray-800 text-gray-300 border border-gray-800 text-[10px] font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-                      >
-                        <Copy size={12} />
-                        {cvCopied ? "¡Copiado!" : (lang === "ar" ? "نسخ النص" : "Copiar Texto")}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* High Fidelity CV Box modeled after Carlos Méndez layout image provided */}
-                  <div className="bg-white text-gray-850 rounded-2xl overflow-hidden shadow-2xl flex min-h-[600px] border border-gray-200 font-sans text-left">
-                    {/* Dark leftist column (sidebar) */}
-                    <div className="w-[35%] bg-slate-950 text-white p-5 flex flex-col justify-between shrink-0 border-r border-gray-100">
-                      <div className="space-y-6">
-                        {/* Avatar initials circle with dynamic layout */}
-                        <div className="flex flex-col items-center text-center">
-                          <div className="w-16 h-16 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center font-extrabold text-2xl shadow-md border-2 border-white/20">
-                            {cvData.name ? cvData.name.charAt(0) : "S"}
-                          </div>
-                          <div className="text-[9px] text-amber-300 font-mono mt-2 uppercase tracking-wider font-semibold">
-                            {lang === "ar" ? "نموذج سيرة" : "MODELO DE CV"}
-                          </div>
-                        </div>
-
-                        {/* Contact section */}
-                        <div className="space-y-2">
-                          <h4 className="text-white font-extrabold text-[11px] uppercase tracking-wider border-b border-gray-805 pb-1 flex items-center gap-1">
-                            <span>📞</span> {lang === "ar" ? "الجريدة والاتصال" : "Contacto"}
-                          </h4>
-                          <div className="text-[10px] space-y-1.5 text-gray-300 leading-normal">
-                            <div>
-                              <span className="text-gray-500 block text-[9px]">Correo:</span>
-                              <span className="font-medium text-white break-all">{cvData.email}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500 block text-[9px]">Ubicación:</span>
-                              <span className="font-medium text-white">{cvData.city}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Education Section */}
-                        <div className="space-y-2">
-                          <h4 className="text-white font-extrabold text-[11px] uppercase tracking-wider border-b border-gray-800 pb-1 flex items-center gap-1">
-                            <span>🎓</span> {lang === "ar" ? "التكوين الأكاديمي" : "Formación"}
-                          </h4>
-                          <div className="text-[10px] space-y-1 text-gray-300 leading-relaxed font-sans">
-                            <p className="font-semibold text-white leading-normal">{cvData.edu}</p>
-                            <p className="text-gray-400 text-[9px] italic">{lang === "ar" ? "معادلة مصدقة in إسبانيا" : "Equivalencia Homologada en España"}</p>
-                          </div>
-                        </div>
-
-                        {/* Hard Skills Section */}
-                        <div className="space-y-2">
-                          <h4 className="text-white font-extrabold text-[11px] uppercase tracking-wider border-b border-gray-800 pb-1 flex items-center gap-1">
-                            <span>⚙️</span> {lang === "ar" ? "القدرات الفنية" : "Aptitudes"}
-                          </h4>
-                          <ul className="text-[10px] space-y-1 text-gray-300 list-disc list-inside leading-relaxed">
-                            {cvData.skills.split(",").map((sk, sIdx) => {
-                              const trimmed = sk.trim();
-                              if (!trimmed) return null;
-                              return <li key={sIdx} className="truncate" title={trimmed}>{trimmed}</li>;
-                            })}
-                          </ul>
-                        </div>
-                      </div>
-
-                      <div className="text-[8px] text-gray-500 font-mono mt-4 leading-normal text-center border-t border-gray-900 pt-2 font-semibold">
-                        Ejemplo de Currículum para Estudiantes. Formato de Presentación Profesional.
-                      </div>
-                    </div>
-
-                    {/* Classic Right side (main content) */}
-                    <div className="flex-1 bg-white p-6 flex flex-col justify-between text-left text-slate-800 font-sans">
-                      <div className="space-y-5">
-                        {/* Name and massive bold headline styled like Carlos Méndez */}
-                        <div>
-                          <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase leading-none font-sans">
-                            {cvData.name}
-                          </h3>
-                          <div className="mt-1.5 bg-slate-900 text-amber-400 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest inline-block rounded">
-                            {cvData.role}
-                          </div>
-                        </div>
-
-                        {/* Personal summary block */}
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                            <span className="text-amber-500">👤</span> {lang === "ar" ? "الخطوط العريضة والمستهدف" : "Perfil Personal"}
-                          </h4>
-                          <p className="text-[10px] text-slate-600 leading-relaxed">
-                            {lang === "ar"
-                              ? `مهني طموح يسعى للانضمام إلى سوق العمل الإسباني في منصب ${cvData.role}. أمتلك قدرة تامة على التكيف السريع، الالتزام بالمعايير المهنية، والاستعداد لتعلم العمليات واللوائح المحلية بكفاءة.`
-                              : `Profesional comprometido con alta motivación para integrarse rápidamente en el mercado laboral de España en el puesto de ${cvData.role || "su especialidad"}. Demostrada iniciativa, mentalidad de crecimiento, y plena adaptabilidad a la normativa y ritmos de trabajo locales.`}
-                          </p>
-                        </div>
-
-                        {/* Employment experience timeline */}
-                        <div className="space-y-2">
-                          <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                            <span className="text-amber-500">💼</span> {lang === "ar" ? "الخبرات والتدريب الميداني" : "Experiencia Laboral"}
-                          </h4>
-                          
-                          <div className="space-y-3 relative before:absolute before:top-1 before:bottom-1 before:left-1.5 before:w-0.5 before:bg-slate-100 pl-4 font-sans">
-                            <div className="relative">
-                              <div className="absolute -left-[19px] top-1.5 w-2 h-2 rounded-full border border-amber-500 bg-white" />
-                              <div className="flex justify-between items-start flex-wrap text-[10px] mb-0.5">
-                                <span className="font-extrabold text-slate-950 uppercase">{cvData.role}</span>
-                                <span className="font-mono text-slate-450 text-[9px]">2024 - Actualidad</span>
-                              </div>
-                              <span className="text-[9px] text-amber-600 block font-semibold mb-1">Proyecto de Capacitación / Prácticas</span>
-                              <p className="text-[9.5px] text-slate-650 leading-relaxed font-sans">
-                                {cvData.exp}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Languages section */}
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                            <span className="text-amber-500">🌍</span> {lang === "ar" ? "اللغات والتواصل" : "Idiomas"}
-                          </h4>
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {lang === "ar" ? (
-                              <>
-                                <span className="bg-slate-100 text-slate-900 text-[9px] font-bold px-2 py-0.5 rounded border border-slate-200">الأسبانية (مستوى متقدم للمهنة)</span>
-                                <span className="bg-slate-100 text-slate-900 text-[9px] font-bold px-2 py-0.5 rounded border border-slate-200">العربية (اللغة الأم)</span>
-                                <span className="bg-slate-100 text-slate-900 text-[9px] font-bold px-2 py-0.5 rounded border border-slate-200">الإنجليزية (مهني B2)</span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="bg-slate-150 text-slate-900 text-[9px] font-extrabold px-2 py-0.5 rounded border border-slate-200">Español (Competencia Laboral CCSE/A2)</span>
-                                <span className="bg-slate-150 text-slate-900 text-[9px] font-extrabold px-2 py-0.5 rounded border border-slate-200">Árabe (Lengua Nativa)</span>
-                                <span className="bg-slate-150 text-slate-900 text-[9px] font-extrabold px-2 py-0.5 rounded border border-slate-200">Inglés (Nivel Técnico B2)</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                      </div>
-
-                      {/* Disclaimer footer stamp */}
-                      <div className="border-t border-slate-150 pt-2.5 mt-3 flex items-start gap-1.5">
-                        <span className="text-[11px] mt-0.5 shrink-0 block">⚠️</span>
-                        <p className="text-[8px] text-slate-400 font-sans leading-normal block">
-                          <strong>AVISO DE MODELO:</strong> Este CV representa un ejemplo ideal de presentación e idoneidad profesional para el mercado español. Descarga el modelo PDF para tener una plantilla idéntica estructurada según los estándares del reclutamiento en España.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {/* TAB: TEACHERS & TUTORS SECTION */}
-          {tab === "teachers" && (
-            <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl space-y-6 animate-fade-in text-left">
-              <div className="flex justify-between items-start flex-wrap gap-4 border-b border-gray-800 pb-5">
-                <div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2.5 font-sans">
-                    <span>👨‍🏫</span>
-                    {lang === "es" ? "Profesores y Tutores de Apoyo" : lang === "ar" ? "الأساتذة المعتمدون والمدرسون" : "Teachers & Academic Tutors"}
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {lang === "es" ? "Resuelve dudas de idioma, preparación PCE Selectividad o materias de FP con profesores homologados." :
-                     lang === "ar" ? "تواصل مباشرة مع أسatذة لمساعدتك في تعلم الإسبانية، التحضير لاختبارات الولوج والنجاح الجامعي." :
-                     "Direct support from accredited academic professors for your Spanish lessons, PCE Exams, and FP topics."}
-                  </p>
-                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(dbStats?.teachers || []).map((tch: any, idx: number) => (
-                  <div key={tch.id || idx} className="bg-[#070a13] border border-gray-800 p-5 rounded-2xl flex flex-col justify-between space-y-4 hover:border-amber-500/30 transition-all">
-                    <div className="flex gap-4">
-                      <img 
-                        src={tch.photoUrl || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200"} 
-                        alt={tch.name} 
-                        className="w-14 h-14 rounded-full object-cover border-2 border-amber-500/20 shrink-0"
-                        referrerPolicy="no-referrer"
+                {/* Form fields controls block */}
+                <div className="space-y-4 bg-[#070a13] p-4 rounded-2xl border border-gray-800">
+                  <div>
+                    <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1">Nombre y Apellido completo:</label>
+                    <input 
+                      type="text" 
+                      value={cvData.name}
+                      onChange={(e) => setCvData(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full bg-[#0c1222] border border-gray-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1">Email de Contacto:</label>
+                      <input 
+                        type="email" 
+                        value={cvData.email}
+                        onChange={(e) => setCvData(prev => ({ ...prev, email: e.target.value }))}
+                        className="w-full bg-[#0c1222] border border-gray-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500 font-mono"
                       />
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-white text-sm">{tch.name}</h3>
-                          <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 font-mono">
-                            ★ {tch.rating || 5.0}
-                          </span>
-                        </div>
-                        <p className="text-xs text-amber-500 font-medium">{tch.subject}</p>
-                        <p className="text-[11px] text-gray-400 font-mono select-all select-text">{tch.email}</p>
-                        {tch.phone && <p className="text-[11px] text-gray-500 font-mono select-all select-text">{tch.phone}</p>}
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1">Ciudad Destino (España):</label>
+                      <input 
+                        type="text" 
+                        value={cvData.city}
+                        onChange={(e) => setCvData(prev => ({ ...prev, city: e.target.value }))}
+                        className="w-full bg-[#0c1222] border border-gray-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1">Puesto u Objetivo Profesional:</label>
+                    <input 
+                      type="text" 
+                      value={cvData.role}
+                      onChange={(e) => setCvData(prev => ({ ...prev, role: e.target.value }))}
+                      className="w-full bg-[#0c1222] border border-gray-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1">Formación Académica principal:</label>
+                    <textarea 
+                      rows={2}
+                      value={cvData.edu}
+                      onChange={(e) => setCvData(prev => ({ ...prev, edu: e.target.value }))}
+                      className="w-full bg-[#0c1222] border border-gray-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500 font-sans"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1">Competencias e Idiomas:</label>
+                    <textarea 
+                      rows={2}
+                      value={cvData.skills}
+                      onChange={(e) => setCvData(prev => ({ ...prev, skills: e.target.value }))}
+                      className="w-full bg-[#0c1222] border border-gray-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500 font-sans"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 uppercase font-mono block mb-1">Experiencia Práctica / Proyectos de ejemplo:</label>
+                    <textarea 
+                      rows={3}
+                      value={cvData.exp}
+                      onChange={(e) => setCvData(prev => ({ ...prev, exp: e.target.value }))}
+                      className="w-full bg-[#0c1222] border border-gray-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500 font-sans"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleGenerateCV}
+                    disabled={cvGenerating}
+                    className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-gray-950 font-extrabold text-xs tracking-wider uppercase rounded-xl transition-all cursor-pointer shadow-md"
+                  >
+                    {cvGenerating ? "Generando Maqueta..." : "⚡ Renderizar Curriculum de Referencia"}
+                  </button>
+                </div>
+
+                {/* Right side interactive live preview block container */}
+                <div className="space-y-4 flex flex-col justify-between">
+                  <div className="bg-gray-900/40 border border-gray-800 p-4 rounded-2xl flex-1 min-h-[300px]">
+                    <span className="text-[10px] uppercase font-mono text-gray-500 block mb-3 tracking-widest">LIVE MAQUETA PREVIEW:</span>
+                    
+                    {cvHtml ? (
+                      <div className="bg-white text-gray-900 rounded-xl overflow-hidden p-1 shadow-inner animate-fade-in text-left scale-[0.98] origin-top">
+                        <div dangerouslySetInnerHTML={{ __html: cvHtml }} />
                       </div>
-                    </div>
-                    <p className="text-xs text-gray-300 leading-relaxed italic bg-black/20 p-3 rounded-xl border border-gray-800/40">
-                      "{tch.bio}"
-                    </p>
-                    <div className="flex gap-2">
-                      <a 
-                        href={`mailto:${tch.email}?subject=Consulta de Alumno `}
-                        className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-black text-center text-xs font-bold rounded-xl transition-all"
+                    ) : (
+                      <div className="text-center py-20 text-xs text-gray-500 font-mono border border-dashed border-gray-800 rounded-xl h-full flex items-center justify-center">
+                        Presiona el botón de renderizar para ver el modelo de ejemplo optimizado.
+                      </div>
+                    )}
+                  </div>
+
+                  {cvHtml && (
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={handleDownloadCVPDF}
+                        className="flex-1 min-w-[140px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                       >
-                        {lang === "es" ? "📩 Contactar por Email" : lang === "ar" ? "📩 اتصل بالبريد" : "📩 Contact by Email"}
-                      </a>
-
+                        📥 Descargar PDF de Referencia
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(cvData, null, 2));
+                          setCvCopied(true);
+                          setTimeout(() => setCvCopied(false), 2000);
+                        }}
+                        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+                      >
+                        {cvCopied ? "¡Copiado! ✓" : "Copiar Config"}
+                      </button>
                     </div>
-                  </div>
-                ))}
-
-                {(dbStats?.teachers || []).length === 0 && (
-                  <div className="col-span-2 text-center py-8 text-xs text-gray-400 font-mono">
-                    No hay profesores cargados actualmente en el sistema.
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           )}
 
-        </main>
-      </div>
-
-      {/* FOOTER */}
-      <footer className="bg-[#080d19] border-t border-[#1b253b] py-6 text-center text-xs text-gray-500 select-none">
-        <div className="max-w-7xl mx-auto px-4 space-y-2">
-          <p className="font-sans leading-relaxed">
-            {lang === "ar" ? "بوابة الدراسة في إسبانيا — دليل الطلاب العرب المهاجرين والتعليم المعتمد © 2026" :
-             "Spain Study Portal — Manuel d'orientation et d'apprentissage linguistique d'Extranjería © 2026"}
-          </p>
-          <div className="flex justify-center gap-3 text-[10px] text-gray-600 flex-wrap">
-            <span className="bg-[#0c1222] px-2 py-0.5 rounded border border-[#1b253b]">NON-OFFICIAL ASSISTANCE</span>
-            <span className="bg-[#0c1222] px-2 py-0.5 rounded border border-[#1b253b]">GEMINI 3.5 FLASH ENGAGED</span>
-            <span className="bg-[#0c1222] px-2 py-0.5 rounded border border-[#1b253b]">OFFLINE AUDIO POWERED</span>
-          </div>
-        </div>
-      </footer>
-
-      {/* DETAILED SPECIALTY POPUP / MODAL */}
-      {selectedSpecialty && (() => {
-        const details = getSpecialtyDetails(selectedSpecialty.name.en, lang, selectedSpecialty.salidas[lang]);
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in animate-duration-205">
-            <div 
-              className="relative w-full max-w-2xl bg-[#0a1020] border-2 border-[#1e2e4b] rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Decorative Header */}
-              <div className="h-2 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600" />
-              
-              {/* Modal Scrollable Container */}
-              <div className="p-6 overflow-y-auto space-y-6">
-                {/* Header */}
-                <div className="flex justify-between items-start gap-4">
-                  <div>
-                    <span className="text-[10px] uppercase tracking-widest text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/10 font-bold font-mono border border-amber-500/20">
-                      {lang === "es" ? "Especialidad Educativa" : lang === "ar" ? "التخصص التعليمي" : lang === "fr" ? "Spécialité d'Étude" : "Educational Specialty"}
-                    </span>
-                    <h3 className="text-xl font-extrabold text-white mt-2.5 tracking-tight leading-snug">
-                      {t(selectedSpecialty.name)}
-                    </h3>
-                    <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5 font-mono">
-                      <span>⏱</span>
-                      <strong>{lang === "es" ? "Duración aproximada:" : lang === "ar" ? "المدة التقريبية:" : lang === "fr" ? "Durée approximative :" : "Approximate Duration:"}</strong>
-                      <span className="text-amber-300 font-semibold">{details.duration}</span>
-                    </p>
-                  </div>
-                  <button 
-                    onClick={() => setSelectedSpecialty(null)}
-                    className="p-2 rounded-xl bg-gray-800/80 border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-700 transition-all cursor-pointer shadow-sm shrink-0"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Complete Description */}
-                <div className="space-y-2.5">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#94a3b8] flex items-center gap-2 font-mono">
-                    <span className="text-amber-500">➔</span>
-                    {lang === "es" ? "Descripción Completa" : lang === "ar" ? "الوصف التفصيلي الكامل" : lang === "fr" ? "Description Détaillée" : "Detailed Description"}
-                  </h4>
-                  <p className="text-sm text-gray-300 leading-relaxed bg-[#0c1426] p-4 rounded-xl border border-[#1b2b48]">
-                    {details.description}
-                  </p>
-                </div>
-
-                {/* Subjects (What is Taught / Lo que se enseña) */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#94a3b8] flex items-center gap-2 font-mono">
-                    <span className="text-amber-400">📚</span>
-                    {lang === "es" ? "¿Qué se enseña? (Asignaturas y Módulos)" : lang === "ar" ? "ماذا ستتعلم؟ (المواد والوحدات الدراسية)" : lang === "fr" ? "Ce qui est enseigné (Programme & Modules)" : "What is Taught? (Syllabus & Modules)"}
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {details.subjects.map((subj, idx) => (
-                      <div key={idx} className="flex gap-2.5 items-start p-3 bg-[#0d1627]/60 border border-[#1b2a45] rounded-xl shadow-sm">
-                        <span className="text-amber-500 font-bold mt-0.5 select-none">✓</span>
-                        <span className="text-xs text-gray-200 font-medium">{subj}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Gained Skills (Competencies / Lo que tiene con detalle) */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#94a3b8] flex items-center gap-2 font-mono">
-                    <span className="text-amber-400">🎯</span>
-                    {lang === "es" ? "Competencias y Habilidades Técnicas" : lang === "ar" ? "الجدارات والمهارات التقنية المكتسبة" : lang === "fr" ? "Compétences & Habiletés techniques" : "Gained Technical Skills"}
-                  </h4>
-                  <ul className="grid grid-cols-1 gap-2">
-                    {details.skills.map((skill, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5 text-xs text-gray-300 bg-[#0d1627]/30 p-2.5 border border-gray-800/40 rounded-lg">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 flex-shrink-0" />
-                        <span>{skill}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Career Outlets */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#94a3b8] flex items-center gap-2 font-mono">
-                    <span className="text-amber-400">💼</span>
-                    {lang === "es" ? "Principales Salidas Profesionales" : lang === "ar" ? "أبزر آفاق ومناصب العمل والتوظيف" : lang === "fr" ? "Débouchés de Carrière Majeurs" : "Major Career Outlets"}
-                  </h4>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {selectedSpecialty.salidas[lang]?.map((sal, sIdx) => (
-                      <span key={sIdx} className="text-xs px-3 py-1.5 rounded-xl bg-gray-900 border border-gray-800/80 text-gray-200 font-medium">
-                        {sal}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+          {/* TAB 8: COMMUNITY CHATROOM */}
+          {tab === "chat" && (
+            <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl flex flex-col h-[560px]">
+              <div className="mb-4 shrink-0">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <MessageSquare className="text-amber-500" />
+                  {lang === "ar" ? "ملتقى الطلاب المباشر والمجتمع" : "Forum d'Entraide Universitaire & Salons"}
+                </h2>
+                <p className="text-xs text-gray-400 mt-1">
+                  {lang === "ar" ? "تبادل الخبرات مع زملائك حول مواعيد القنصلية، السكن، وتجارب الـ Homologación" : "Posez vos questions en espagnol ou français, l'IA corrigera instantanément vos erreurs."}
+                </p>
               </div>
 
-              {/* Modal Action Footer */}
-              <div className="p-4 bg-[#070b16] border-t border-[#142137] flex justify-end gap-3">
-                <button 
-                  onClick={() => setSelectedSpecialty(null)}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black text-xs font-semibold tracking-wide cursor-pointer transition-colors"
+              {/* Chat lines area container */}
+              <div className="flex-1 bg-[#070a13] border border-gray-800/80 rounded-2xl p-4 overflow-y-auto space-y-3.5 shadow-inner">
+                {chats.map((c) => {
+                  const isTeacher = c.user.includes("Profesor");
+                  return (
+                    <div 
+                      key={c.id || Math.random().toString()} 
+                      className={`flex flex-col max-w-[85%] animate-fade-in ${isTeacher ? 'bg-blue-600/10 border-2 border-blue-500/20 text-blue-100 p-3.5 rounded-2xl mx-auto w-full' : 'bg-[#0c1222] border border-gray-800/60 p-3 rounded-xl'}`}
+                    >
+                      <div className="flex items-center gap-2 text-[10px] font-mono font-bold tracking-tight">
+                        <span className={isTeacher ? "text-blue-400 font-extrabold" : "text-amber-500"}>{c.user}</span>
+                        <span className="text-gray-600 font-normal ml-auto">{c.time || "ahora"}</span>
+                      </div>
+                      <p className="text-xs mt-1.5 leading-relaxed text-gray-200 select-text whitespace-pre-line font-sans">
+                        {c.text}
+                      </p>
+                    </div>
+                  );
+                })}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* Chat action message input bar layout container */}
+              <div className="mt-4 pt-1 shrink-0 flex gap-2">
+                <input 
+                  type="text"
+                  placeholder={
+                    lang === "ar" ? "اكتب سؤالك أو مشاركتك هنا للجميع..." :
+                    lang === "es" ? "Escribe un mensaje en la comunidad... (¡Suma +5 XP!)" :
+                    "Tapez votre message ici..."
+                  }
+                  value={chatInp}
+                  onChange={(e) => setChatInp(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && chatInp.trim()) handleSendChatRoom();
+                  }}
+                  className="bg-[#070a13] border border-gray-800 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-amber-500 flex-1 transition-colors font-sans"
+                />
+                <button
+                  disabled={!chatInp.trim()}
+                  onClick={handleSendChatChatroom}
+                  className="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-gray-950 font-extrabold text-xs px-5 rounded-xl cursor-pointer transition-colors font-sans"
                 >
-                  {lang === "es" ? "Entendido, cerrar" : lang === "ar" ? "حسناً، إغلاق" : lang === "fr" ? "D'accord, fermer" : "Got it, close"}
+                  {lang === "ar" ? "إرسال" : "Enviar"}
                 </button>
               </div>
             </div>
+          )}
+
+          {/* TAB 9: DESTINATION CITIES GUIDES */}
+          {tab === "cities" && (
+            <div className="bg-[#0c1222] border border-[#1b253b] p-6 rounded-3xl shadow-xl">
+              <div className="mb-5 flex items-start justify-between flex-wrap gap-2">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Compass className="text-amber-500" />
+                    {lang === "ar" ? "دليل المدن الإسبانية للطلاب" : "Guide de Survie & Logistique par Ville"}
+                  </h2>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {lang === "ar" ? "معلومات عملية مخصصة لكل مدينة حول الأنشطة، الاندماج ومؤشر أسعار السوبرماركت" : "Découvrez les secrets logistiques, les événements salsa et l'indice de prix des supermarchés."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-1.5 flex-wrap bg-[#070a13] p-1 border border-gray-800/80 rounded-2xl mb-6">
+                {STUDENT_CITIES_GUIDE.map(cityObj => (
+                  <button
+                    key={cityObj.city}
+                    onClick={() => setSelectedCityLife(cityObj.city)}
+                    className={`px-4 py-2 text-xs font-semibold rounded-xl focus:outline-none transition-colors ${selectedCityLife === cityObj.city ? 'bg-amber-500 text-gray-900 font-bold' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    {cityObj.flag} {cityObj.city}
+                  </button>
+                ))}
+              </div>
+
+              {(() => {
+                const currentCityObj = STUDENT_CITIES_GUIDE.find(c => c.city === selectedCityLife) || STUDENT_CITIES_GUIDE[0];
+                return (
+                  <div className="space-y-6 animate-fade-in">
+                    
+                    <div className="p-5 bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 rounded-2xl flex justify-between items-center flex-wrap gap-4">
+                      <div>
+                        <span className="text-[10px] uppercase font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">
+                          STUDENT PROFILE DOSSIER
+                        </span>
+                        <h3 className="text-xl font-black text-white mt-1.5">
+                          {currentCityObj.city} {currentCityObj.flag}
+                        </h3>
+                        <p className="text-xs text-gray-400 mt-1 max-w-md font-sans">
+                          Guía logística integral de integración comunitaria, redes estudiantiles y optimización de presupuesto de alimentación.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => handleDownloadCityPDF(currentCityObj)}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs tracking-wider uppercase rounded-xl shadow transition-transform duration-150 transform active:scale-95 cursor-pointer"
+                      >
+                        📥 Guardar Guía en PDF Offline
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-sans">
+                      <div className="bg-[#070a13] border border-gray-800 p-4 rounded-xl space-y-2">
+                        <span className="text-[10px] text-amber-400 uppercase font-mono font-bold">1. Eventos Estudiantiles & Salsa:</span>
+                        <p className="text-xs text-gray-300 leading-relaxed">
+                          {currentCityObj.events[lang as keyof typeof currentCityObj.events] || currentCityObj.events.es}
+                        </p>
+                      </div>
+
+                      <div className="bg-[#070a13] border border-gray-800 p-4 rounded-xl space-y-2">
+                        <span className="text-[10px] text-emerald-400 uppercase font-mono font-bold">2. Integración & Hacer Amigos Locales:</span>
+                        <p className="text-xs text-gray-300 leading-relaxed">
+                          {currentCityObj.friends[lang as keyof typeof currentCityObj.friends] || currentCityObj.friends.es}
+                        </p>
+                      </div>
+
+                      <div className="bg-[#070a13] border border-gray-800 p-4 rounded-xl space-y-2">
+                        <span className="text-[10px] text-blue-400 uppercase font-mono font-bold">3. Supermercados Ahorro & Tips:</span>
+                        <p className="text-xs text-gray-300 leading-relaxed">
+                          <strong>Rankings:</strong> {currentCityObj.supermarkets.ranking[lang as keyof typeof currentCityObj.supermarkets.ranking] || currentCityObj.supermarkets.ranking.es}
+                          <br /><br />
+                          <strong>Pro-Tip:</strong> {currentCityObj.supermarkets.tips[lang as keyof typeof currentCityObj.supermarkets.tips] || currentCityObj.supermarkets.tips.es}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* DETAILED MODAL SHEET POPUP OVERLAY */}
+      {selectedSpecialty && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#0c1222] border-2 border-[#1b253b] rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex justify-between items-start border-b border-gray-800 pb-3">
+              <div>
+                <span className="text-[10px] font-mono text-amber-400 uppercase tracking-widest block font-bold">Asignaturas oficiales y Módulos</span>
+                <h3 className="text-lg font-bold text-white mt-1">{t(selectedSpecialty.name)}</h3>
+              </div>
+              <button 
+                onClick={() => setSelectedSpecialty(null)}
+                className="w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-xs text-white font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Specialty content compiler */}
+            {(() => {
+              const details = getSpecialtyDetails(selectedSpecialty.id || t(selectedSpecialty.name), lang);
+              return (
+                <div className="space-y-4 font-sans">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-[#070a13] p-3.5 border border-gray-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-gray-500 font-mono block uppercase">MÓDULOS PRIMER AÑO:</span>
+                      <p className="text-xs text-gray-200 leading-relaxed whitespace-pre-line">{details.year1}</p>
+                    </div>
+                    <div className="bg-[#070a13] p-3.5 border border-gray-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-gray-500 font-mono block uppercase">MÓDULOS SEGUNDO AÑO:</span>
+                      <p className="text-xs text-gray-200 leading-relaxed whitespace-pre-line">{details.year2}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-500/5 p-4 rounded-xl border border-amber-500/20 text-xs text-amber-300 leading-relaxed">
+                    <strong>💼 Prácticas Obligatorias FCT:</strong> {details.fct}
+                  </div>
+
+                  <div className="p-4 bg-gray-900/60 border border-gray-800 rounded-xl text-xs space-y-1.5">
+                    <span className="font-bold text-white block">🚀 {lang === "ar" ? "لماذا تختار هذا التخصص؟" : "¿Por qué elegir esta familia profesional?"}</span>
+                    <p className="text-gray-400 leading-relaxed">{details.reason}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="pt-2 border-t border-gray-800 flex justify-end">
+              <button
+                onClick={() => setSelectedSpecialty(null)}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-[#070a13] font-extrabold text-xs tracking-wider uppercase rounded-xl transition-all cursor-pointer"
+              >
+                Entendido
+              </button>
+            </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
+
+      {/* CONSOLIDATED REGULATORY FOOTER DISCLAIMER */}
+      <footer className="bg-[#080d1a] border-t border-[#1b253b] text-center p-4 mt-8 shrink-0 text-xs text-gray-500 font-sans">
+        <p className="max-w-2xl mx-auto leading-relaxed select-text">
+          © 2026 Spain Study Student Portal (Atrévete a España). All rights reserved. 
+          Todas las maquetas curriculares, itinerarios de extranjería e índices de precios mostrados son simulaciones de referencia educativa para guiar el expediente del alumno árabe.
+        </p>
+      </footer>
     </div>
   );
 }
